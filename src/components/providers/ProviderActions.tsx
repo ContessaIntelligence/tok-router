@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "../ui/button";
+import { useI18n } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 
 interface ProviderActionsProps {
@@ -53,6 +54,7 @@ export function ProviderActions({
   onEdit,
   onDelete,
 }: ProviderActionsProps) {
+  const { t } = useI18n();
   const iconButtonClass = "h-8 w-8 p-1";
   const mainDisabled =
     busy ||
@@ -61,14 +63,14 @@ export function ProviderActions({
     (!isAdditive && isCurrent) ||
     (isAdditive && isCurrent && !canRemove);
   const mainLabel = isReadOnly
-    ? "Managed"
+    ? t("Managed")
     : isAdditive
       ? isCurrent
-        ? "Remove"
-        : "Add"
+        ? t("Remove")
+        : t("Add")
       : isCurrent
         ? currentLabel
-        : "Switch";
+        : t("Switch");
   const mainVariant = isCurrent ? "secondary" : "default";
   const handleMainAction = isAdditive && isCurrent ? onRemove : onSwitch;
 
@@ -82,16 +84,21 @@ export function ProviderActions({
           disabled={mainDisabled}
           aria-label={
             switching
-              ? `Updating ${providerName}`
+              ? t("Updating {name}", { name: providerName })
               : isReadOnly
-                ? `${providerName}: ${readOnlyLabel}`
+                ? t("{name}: {label}", {
+                    name: providerName,
+                    label: readOnlyLabel,
+                  })
                 : isAdditive && isCurrent
-                  ? `Remove ${providerName} from configuration`
+                  ? t("Remove {name} from configuration", {
+                      name: providerName,
+                    })
                   : isAdditive
-                    ? `Add ${providerName} to configuration`
+                    ? t("Add {name} to configuration", { name: providerName })
                     : isCurrent
                       ? currentAriaLabel
-                      : `Switch to ${providerName}`
+                      : t("Switch to {name}", { name: providerName })
           }
           className={cn(
             "w-[4.5rem] px-2.5",
@@ -108,7 +115,7 @@ export function ProviderActions({
           {switching ? (
             <>
               <LoaderCircle className="h-4 w-4 animate-spin" />
-              <span className="sr-only">Switching</span>
+              <span className="sr-only">{t("Switching")}</span>
             </>
           ) : isReadOnly || (!isAdditive && isCurrent) ? (
             <Check className="h-4 w-4" />
@@ -129,8 +136,8 @@ export function ProviderActions({
           variant="ghost"
           onClick={onEdit}
           disabled={!canEdit || busy}
-          title={`Edit ${providerName}`}
-          aria-label={`Edit ${providerName}`}
+          title={t("Edit {name}", { name: providerName })}
+          aria-label={t("Edit {name}", { name: providerName })}
           className={cn(
             iconButtonClass,
             (!canEdit || busy) &&
@@ -148,10 +155,10 @@ export function ProviderActions({
           disabled={!canDelete || busy}
           title={
             isReadOnly
-              ? `${providerName}: ${readOnlyLabel}`
-              : `Delete ${providerName}`
+              ? t("{name}: {label}", { name: providerName, label: readOnlyLabel })
+              : t("Delete {name}", { name: providerName })
           }
-          aria-label={`Delete ${providerName}`}
+          aria-label={t("Delete {name}", { name: providerName })}
           className={cn(
             iconButtonClass,
             canDelete && !busy && "hover:text-red-500 dark:hover:text-red-400",

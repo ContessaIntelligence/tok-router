@@ -59,6 +59,7 @@ import {
   initialTheme,
   type Theme,
 } from "./lib/preferences";
+import { I18nProvider, useI18n } from "./lib/i18n";
 import { errorMessage, providersApi } from "./lib/providers";
 
 const APP_STORAGE_KEY = "cc-switch-lite:last-app";
@@ -172,13 +173,16 @@ function endpointCandidate(value: JsonValue): string | undefined {
   return undefined;
 }
 
-function visibleEndpoint(provider: ProviderRecord): string {
+function visibleEndpoint(
+  provider: ProviderRecord,
+  customLabel: string,
+): string {
   const value = endpointCandidate(provider.settings);
   if (!value) return "";
   try {
     return new URL(value).origin;
   } catch {
-    return "Custom endpoint";
+    return customLabel;
   }
 }
 
@@ -193,6 +197,15 @@ function adapterMatchesProvider(
 }
 
 export default function App() {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
+  );
+}
+
+function AppContent() {
+  const { t } = useI18n();
   const [activeApp, setActiveApp] = useState<AppId>(initialApp);
   const [currentView, setCurrentView] = useState<View>(initialView);
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -248,10 +261,10 @@ export default function App() {
   const providerListReadyRef = useRef(providerListReady);
   catalogReadyRef.current = catalogReady;
   providerListReadyRef.current = providerListReady;
-  const currentLabel = "In Use";
+  const currentLabel = t("In Use");
   const importLabel = isClaude
-    ? "Import Claude Code user configuration"
-    : `Import current ${definition.label} configuration`;
+    ? t("Import Claude Code user configuration")
+    : t("Import current {app} configuration", { app: definition.label });
   const activeAdapters = adapters.filter((item) => item.appId === activeApp);
   const nativeLiveAdapter = activeAdapters.find((item) =>
     isNativeAdapter(item.reference),
@@ -277,7 +290,7 @@ export default function App() {
         : undefined;
   const contentTopOffset = DRAG_BAR_HEIGHT + HEADER_HEIGHT;
   const addActionButtonClass =
-    "bg-orange-500 hover:bg-orange-600 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-500/40 rounded-full w-8 h-8";
+    "bg-orange-500 hover:bg-orange-600 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-500/40 rounded-full h-9 px-4 gap-1.5 whitespace-nowrap";
 
   const refreshCurrent = useCallback(
     async (app: AppId, showError = true): Promise<boolean> => {
@@ -568,7 +581,9 @@ export default function App() {
         );
       }
       setEditing(null);
-      setNotice(editing === "new" ? "Provider added." : "Provider updated.");
+      setNotice(
+        editing === "new" ? t("Provider added.") : t("Provider updated."),
+      );
       if (currentStateReady) await refreshCurrent(activeApp);
     } catch (error) {
       setMutationError(errorMessage(error));
@@ -620,8 +635,10 @@ export default function App() {
       await refreshCurrent(activeApp);
       setNotice(
         isClaude
-          ? "Imported the Claude Code user configuration."
-          : `Imported the current ${definition.label} configuration.`,
+          ? t("Imported the Claude Code user configuration.")
+          : t("Imported the current {app} configuration.", {
+              app: definition.label,
+            }),
       );
     } catch (error) {
       setLiveError(errorMessage(error));
@@ -648,8 +665,14 @@ export default function App() {
       await refreshCurrent(activeApp);
       setNotice(
         isClaude
-          ? `${provider.name} is now the Claude Code user default. Project, local, or managed settings can override it.`
-          : `${provider.name} is now active for ${definition.label}.`,
+          ? t(
+              "{name} is now the Claude Code user default. Project, local, or managed settings can override it. Restart Claude Code to use it.",
+              { name: provider.name },
+            )
+          : t("{name} is now active for {app}. Restart {app} to use it.", {
+              name: provider.name,
+              app: definition.label,
+            }),
       );
     } catch (error) {
       setLiveError(errorMessage(error));
@@ -671,7 +694,12 @@ export default function App() {
       );
       setProviders(await providersApi.list(activeApp));
       await refreshCurrent(activeApp);
-      setNotice(`${provider.name} was removed from ${definition.label}.`);
+      setNotice(
+        t("{name} was removed from {app}. Restart {app} for it to take effect.", {
+          name: provider.name,
+          app: definition.label,
+        }),
+      );
     } catch (error) {
       setLiveError(errorMessage(error));
     } finally {
@@ -715,17 +743,19 @@ export default function App() {
         (additive || !isCurrent),
       isAdditive: additive,
       isReadOnly: readOnly,
-      readOnlyLabel: "Not supported in Lite",
-      endpoint: providerAdapter ? visibleEndpoint(provider) : "",
+      readOnlyLabel: t("Not supported in Lite"),
+      endpoint: providerAdapter
+        ? visibleEndpoint(provider, t("Custom endpoint"))
+        : "",
       isCurrent,
     };
   });
   const viewTitle =
     currentView === "mcp"
-      ? "MCP Server Management"
+      ? t("MCP Server Management")
       : currentView === "skills"
-        ? "Skills Management"
-        : "Settings";
+        ? t("Skills Management")
+        : t("Settings");
 
   return (
     <div
@@ -754,14 +784,15 @@ export default function App() {
               <Button
                 ref={settingsButtonRef}
                 variant="ghost"
-                size="icon"
+                size="sm"
                 disabled={mutationBusy || liveBusy !== null}
                 onClick={() => setCurrentView("settings")}
-                title="Settings"
-                aria-label="Open settings"
+                title={t("Settings")}
+                aria-label={t("Open settings")}
                 className="hover:bg-black/5 dark:hover:bg-white/5"
               >
-                <SettingsIcon className="h-4 w-4" />
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                {t("Settings")}
               </Button>
             ) : (
               <div className="flex items-center gap-2">
@@ -779,7 +810,7 @@ export default function App() {
                     setCurrentView("providers");
                   }}
                   className="mr-2 rounded-lg"
-                  aria-label="Back to providers"
+                  aria-label={t("Back to providers")}
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -814,8 +845,8 @@ export default function App() {
                             size="sm"
                             onClick={() => setCurrentView("skills")}
                             className="w-8 px-2 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
-                            title="Manage Skills"
-                            aria-label="Manage Skills"
+                            title={t("Manage Skills")}
+                            aria-label={t("Manage Skills")}
                           >
                             <Wrench className="h-4 w-4" />
                           </Button>
@@ -826,8 +857,8 @@ export default function App() {
                             size="sm"
                             onClick={() => setCurrentView("mcp")}
                             className="w-8 px-2 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
-                            title="Manage MCP servers"
-                            aria-label="Manage MCP servers"
+                            title={t("Manage MCP servers")}
+                            aria-label={t("Manage MCP servers")}
                           >
                             <McpIcon size={16} />
                           </Button>
@@ -853,11 +884,11 @@ export default function App() {
                       ) : (
                         <Download className="mr-2 h-4 w-4" />
                       )}
-                      Import
+                      {t("Import")}
                     </Button>
                     <Button
                       ref={addProviderButtonRef}
-                      size="icon"
+                      size="sm"
                       disabled={
                         !providerActionsReady ||
                         !adapter ||
@@ -868,10 +899,13 @@ export default function App() {
                       }
                       onClick={() => openEditor("new")}
                       className={`ml-2 ${addActionButtonClass}`}
-                      aria-label={`Add ${definition.label} provider`}
-                      title="Add new provider"
+                      aria-label={t("Add Routok Key for {app}", {
+                        app: definition.label,
+                      })}
+                      title={t("Add Routok Key")}
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4" />
+                      {t("Add Routok Key")}
                     </Button>
                   </>
                 )}
@@ -885,7 +919,7 @@ export default function App() {
                       className="hover:bg-black/5 dark:hover:bg-white/5"
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Import existing
+                      {t("Import existing")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -895,7 +929,7 @@ export default function App() {
                       className="hover:bg-black/5 dark:hover:bg-white/5"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add MCP
+                      {t("Add MCP")}
                     </Button>
                   </>
                 )}
@@ -954,10 +988,14 @@ export default function App() {
                         appId={activeApp}
                         items={providerItems}
                         isLoading={loading}
-                        emptyTitle={definition.emptyTitle}
+                        emptyTitle={t("Add your first {app} provider", {
+                          app: definition.label,
+                        })}
                         currentLabel={currentLabel}
                         importLabel={
-                          isClaude ? "Import user default" : "Import current"
+                          isClaude
+                            ? t("Import user default")
+                            : t("Import current")
                         }
                         disabled={
                           !providerActionsReady ||

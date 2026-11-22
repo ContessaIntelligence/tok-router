@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 
 import { appDefinition } from "../../lib/apps";
+import { useI18n } from "../../lib/i18n";
 import { resolveProviderIcon } from "../../lib/provider-icon";
 import type { AppId, ProviderRecord } from "../../lib/provider-types";
 import { cn } from "../../lib/utils";
@@ -55,22 +56,27 @@ export function ProviderCard({
   onEdit,
   onDelete,
 }: ProviderCardProps) {
+  const { t } = useI18n();
   const providerIcon = resolveProviderIcon(
     appId,
     provider.icon,
     provider.iconColor,
+    [provider.name, provider.websiteUrl, endpoint],
   );
   const displayEndpoint = adapterAvailable
     ? provider.notes?.trim() ||
       provider.websiteUrl?.trim() ||
       endpoint ||
-      "Default endpoint"
-    : "Adapter unavailable";
+      t("Default endpoint")
+    : t("Adapter unavailable");
   const currentAriaLabel = isAdditive
-    ? `${provider.name} is in ${appDefinition(appId).label}`
+    ? t("{name} is in {app}", {
+        name: provider.name,
+        app: appDefinition(appId).label,
+      })
     : appId === "claude"
-      ? `${provider.name} is the Claude Code user default`
-      : `${provider.name} is current`;
+      ? t("{name} is the Claude Code user default", { name: provider.name })
+      : t("{name} is current", { name: provider.name });
 
   return (
     <div

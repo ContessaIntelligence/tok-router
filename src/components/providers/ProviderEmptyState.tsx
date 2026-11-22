@@ -1,5 +1,6 @@
 import { Download, LoaderCircle, Users } from "lucide-react";
 
+import { useI18n } from "../../lib/i18n";
 import { Button } from "../ui/button";
 
 interface ProviderEmptyStateProps {
@@ -23,6 +24,7 @@ export function ProviderEmptyState({
   onCreate,
   onImport,
 }: ProviderEmptyStateProps) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-10 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -44,7 +46,7 @@ export function ProviderEmptyState({
           {importLabel}
         </Button>
         <Button variant="outline" onClick={onCreate} disabled={disabled}>
-          Add provider
+          {t("Add Routok Key")}
         </Button>
       </div>
     </div>

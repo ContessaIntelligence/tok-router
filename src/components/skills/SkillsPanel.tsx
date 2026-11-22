@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Search, Sparkles } from "lucide-react";
 
+import { useI18n, type Translate } from "../../lib/i18n";
 import { errorMessage } from "../../lib/providers";
 import { skillsApi } from "../../lib/skills";
 import type {
@@ -49,14 +50,18 @@ function stateFor(
   return skill.apps.find((state) => state.app === appId);
 }
 
-function stateTitle(state: SkillAppState | undefined): string | undefined {
-  return state?.reason ? REASON_LABELS[state.reason] : undefined;
+function stateTitle(
+  state: SkillAppState | undefined,
+  t: Translate,
+): string | undefined {
+  return state?.reason ? t(REASON_LABELS[state.reason]) : undefined;
 }
 
 export function SkillsPanel({
   apps,
   onInteractionBlockedChange,
 }: SkillsPanelProps) {
+  const { t } = useI18n();
   const skillApps = useMemo(
     () => apps.filter((app) => app.capabilities.includes("skills")),
     [apps],
@@ -141,7 +146,7 @@ export function SkillsPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6">
       <AppCountBar
-        totalLabel={`${skills.length} installed`}
+        totalLabel={t("{count} installed", { count: skills.length })}
         counts={counts}
         apps={skillApps}
       />
@@ -149,9 +154,9 @@ export function SkillsPanel({
       <ManagementListSearch
         value={search}
         onValueChange={setSearch}
-        placeholder="Search installed skill name, description, or repo..."
-        ariaLabel="Search installed skills"
-        clearLabel="Clear Skill search"
+        placeholder={t("Search installed skill name, description, or repo...")}
+        ariaLabel={t("Search installed skills")}
+        clearLabel={t("Clear Skill search")}
       />
 
       {error && (
@@ -174,15 +179,19 @@ export function SkillsPanel({
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <Sparkles className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h2 className="text-lg font-medium">No skills installed</h2>
+              <h2 className="text-lg font-medium">{t("No skills installed")}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Skills already present in the shared catalog will appear here.
+                {t(
+                  "Skills already present in the shared catalog will appear here.",
+                )}
               </p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Search className="mb-4 h-10 w-10 opacity-40" />
-              <p className="text-sm">No installed skills match your search</p>
+              <p className="text-sm">
+                {t("No installed skills match your search")}
+              </p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-border-default">
@@ -217,7 +226,7 @@ export function SkillsPanel({
                         warning,
                         disabled: !canToggle,
                         pending: busyKey === `${skill.id}:${appId}`,
-                        title: stateTitle(state),
+                        title: stateTitle(state, t),
                       };
                     }}
                     onToggle={(appId) => {
@@ -226,7 +235,12 @@ export function SkillsPanel({
                       if (app && state) void toggle(skill, app, state);
                     }}
                     ariaLabel={(_, state, label) =>
-                      `${state.enabled ? "Disable" : "Enable"} ${skill.name} for ${label}${state.title ? `. ${state.title}` : ""}`
+                      `${t(
+                        state.enabled
+                          ? "Disable {name} for {app}"
+                          : "Enable {name} for {app}",
+                        { name: skill.name, app: label },
+                      )}${state.title ? `. ${state.title}` : ""}`
                     }
                     disabled={blocked}
                   />

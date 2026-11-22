@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Monitor, MoreHorizontal, Terminal } from "lucide-react";
 
 import { appDefinition } from "../lib/apps";
+import { useI18n } from "../lib/i18n";
 import type { AppId, CoreAppDescriptor } from "../lib/provider-types";
 import { cn } from "../lib/utils";
 import { ProviderIcon } from "./ProviderIcon";
@@ -34,7 +35,7 @@ function AppGlyph({
   const BadgeIcon = badgeConfig?.icon;
   return (
     <span className="relative inline-flex shrink-0">
-      <ProviderIcon icon={definition.icon} name={definition.label} size={20} />
+      <ProviderIcon icon={definition.icon} name={definition.label} size={28} />
       {BadgeIcon && (
         <span
           className={cn(
@@ -66,6 +67,7 @@ export function AppSwitcher({
   disabled = false,
   onSwitch,
 }: AppSwitcherProps) {
+  const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const appButtonRefs = useRef(new Map<AppId, HTMLButtonElement>());
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -182,7 +184,7 @@ export function AppSwitcher({
     <div
       ref={rootRef}
       role="navigation"
-      aria-label="Applications"
+      aria-label={t("Applications")}
       className="inline-flex bg-muted rounded-xl p-1 gap-1"
       style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
     >
@@ -204,13 +206,16 @@ export function AppSwitcher({
             aria-label={label}
             aria-pressed={isActive}
             className={cn(
-              "group inline-flex items-center px-3 h-8 rounded-md text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50",
+              "group inline-flex h-14 w-[88px] flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50",
               isActive
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50",
             )}
           >
             <AppGlyph app={app} isActive={isActive} />
+            <span className="w-full truncate text-center leading-tight">
+              {label}
+            </span>
           </button>
         );
       })}
@@ -221,10 +226,10 @@ export function AppSwitcher({
               ref={moreButtonRef}
               type="button"
               disabled={disabled}
-              title="More applications"
-              aria-label="More applications"
+              title={t("More applications")}
+              aria-label={t("More applications")}
               className={cn(
-                "inline-flex items-center px-3 h-8 rounded-md transition-all duration-200 disabled:pointer-events-none disabled:opacity-50",
+                "inline-flex h-14 items-center rounded-md px-3 transition-all duration-200 disabled:pointer-events-none disabled:opacity-50",
                 moreOpen
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50",
@@ -238,7 +243,7 @@ export function AppSwitcher({
             align="end"
             sideOffset={6}
             className="z-[100] w-56 p-1"
-            aria-label="More applications"
+            aria-label={t("More applications")}
             data-app-switcher-overflow="true"
           >
             {overflowList.map((app) => {

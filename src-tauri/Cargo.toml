@@ -1,11 +1,15 @@
 [package]
 name = "cc-switch-lite"
 version = "0.1.0-alpha.1"
-description = "A provider configuration editor for CC Switch applications"
+description = "Token Router - a provider configuration editor"
 license = "MIT"
 repository = "https://github.com/SaladDay/cc-switch-lite"
 edition = "2021"
 rust-version = "1.88"
+
+[[bin]]
+name = "token-router"
+path = "src/main.rs"
 
 [lib]
 name = "cc_switch_lite_lib"

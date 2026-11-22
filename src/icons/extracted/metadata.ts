@@ -612,6 +612,13 @@ export const iconMetadata: Record<string, IconMetadata> = {
     keywords: ["chatglm", "glm"],
     defaultColor: "#0F62FE",
   },
+  routok: {
+    name: "routok",
+    displayName: "RouTok",
+    category: "ai-provider",
+    keywords: ["routok", "token router", "router"],
+    defaultColor: "#37A994",
+  },
   openrouter: {
     name: "openrouter",
     displayName: "OpenRouter",

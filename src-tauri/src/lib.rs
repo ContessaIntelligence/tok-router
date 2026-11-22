@@ -1,8 +1,9 @@
 use std::collections::HashSet;
+use std::sync::OnceLock;
 
 use cc_switch_core::{
     builtin_app_adapter, builtin_app_registry, builtin_simple_provider_forms, AppCapability,
-    AppDescriptor, InstalledSkillSnapshot, SimpleProviderFormDescriptor,
+    AppDescriptor, InstalledSkillSnapshot, SimpleProviderFormDescriptor, SimpleProviderPreset,
 };
 
 mod live;
@@ -36,9 +37,110 @@ fn supported_apps() -> Vec<AppDescriptor> {
     builtin_app_registry().descriptors().cloned().collect()
 }
 
+/// Per-application preset customization: the RouTok preset is listed first and
+/// the named core presets are hidden.
+struct PresetRule {
+    app_id: &'static str,
+    routok: SimpleProviderPreset,
+    hidden: &'static [&'static str],
+}
+
+const fn routok_preset(base_url: &'static str, model: &'static str) -> SimpleProviderPreset {
+    SimpleProviderPreset {
+        id: "routok",
+        name: "RouTok",
+        website_url: "https://api.routok.com",
+        brand_key: "routok",
+        base_url,
+        model,
+    }
+}
+
+const ROUTOK_V1: &str = "https://api.routok.com/v1";
+const HIDDEN_ANTHROPIC: &[&str] = &["kimi", "kimi-coding", "deepseek", "openrouter"];
+const HIDDEN_PROXY_RESELLERS: &[&str] = &["packycode", "apinebula", "openrouter"];
+const HIDDEN_OPENAI_COMPATIBLE: &[&str] = &["kimi", "deepseek", "openrouter"];
+
+const PRESET_RULES: [PresetRule; 9] = [
+    PresetRule {
+        app_id: "claude",
+        routok: routok_preset("https://api.routok.com", "claude-haiku-5-5"),
+        hidden: HIDDEN_ANTHROPIC,
+    },
+    PresetRule {
+        app_id: "claude-desktop",
+        routok: routok_preset("https://api.routok.com", "claude-haiku-5-5"),
+        hidden: HIDDEN_ANTHROPIC,
+    },
+    PresetRule {
+        app_id: "codex",
+        routok: routok_preset(ROUTOK_V1, "gpt-6.1-sol"),
+        hidden: &["packycode", "deepseek", "openrouter"],
+    },
+    PresetRule {
+        app_id: "gemini",
+        routok: routok_preset(ROUTOK_V1, ""),
+        hidden: HIDDEN_PROXY_RESELLERS,
+    },
+    PresetRule {
+        app_id: "grokbuild",
+        routok: routok_preset(ROUTOK_V1, ""),
+        hidden: HIDDEN_PROXY_RESELLERS,
+    },
+    PresetRule {
+        app_id: "opencode",
+        routok: routok_preset(ROUTOK_V1, "gpt-6.1-sol"),
+        hidden: HIDDEN_OPENAI_COMPATIBLE,
+    },
+    PresetRule {
+        app_id: "pi",
+        routok: routok_preset(ROUTOK_V1, "gpt-6.1-sol"),
+        hidden: HIDDEN_OPENAI_COMPATIBLE,
+    },
+    PresetRule {
+        app_id: "openclaw",
+        routok: routok_preset(ROUTOK_V1, "gpt-6.1-sol"),
+        hidden: HIDDEN_OPENAI_COMPATIBLE,
+    },
+    PresetRule {
+        app_id: "hermes",
+        routok: routok_preset(ROUTOK_V1, "gpt-6.1-sol"),
+        hidden: HIDDEN_OPENAI_COMPATIBLE,
+    },
+];
+
+/// Core's simple provider forms with `PRESET_RULES` applied.
+fn simple_provider_forms() -> &'static [SimpleProviderFormDescriptor] {
+    static FORMS: OnceLock<Vec<SimpleProviderFormDescriptor>> = OnceLock::new();
+    FORMS.get_or_init(|| {
+        builtin_simple_provider_forms()
+            .map(|form| {
+                let mut form = form.clone();
+                if let Some(rule) = PRESET_RULES.iter().find(|rule| rule.app_id == form.app_id) {
+                    let mut presets = vec![rule.routok.clone()];
+                    presets.extend(
+                        form.presets
+                            .iter()
+                            .filter(|preset| !rule.hidden.contains(&preset.id))
+                            .cloned(),
+                    );
+                    form.presets = Box::leak(presets.into_boxed_slice());
+                }
+                form
+            })
+            .collect()
+    })
+}
+
+fn simple_provider_form_for(app_id: &str) -> Option<&'static SimpleProviderFormDescriptor> {
+    simple_provider_forms()
+        .iter()
+        .find(|form| form.app_id == app_id)
+}
+
 #[tauri::command]
 fn list_simple_provider_forms() -> Vec<SimpleProviderFormDescriptor> {
-    builtin_simple_provider_forms().cloned().collect()
+    simple_provider_forms().to_vec()
 }
 
 #[derive(Debug, Serialize)]
@@ -185,7 +287,8 @@ fn create_simple_provider(
             )))
         })?;
     let adapter = builtin_app_adapter(&app);
-    let form = adapter.simple_provider_form();
+    let form = simple_provider_form_for(&provider.app_id)
+        .unwrap_or_else(|| adapter.simple_provider_form());
     validate_simple_provider_values(form, &provider.values).map_err(StoreError::InvalidProvider)?;
     let presentation = match provider.preset_id.as_deref() {
         Some(preset_id) => {
@@ -649,13 +752,56 @@ pub fn run() {
             toggle_skill_app,
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run CC Switch Lite");
+        .expect("failed to run Token Router");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{json, Map};
+
+    #[test]
+    fn routok_preset_replaces_hidden_presets_for_configured_applications() {
+        for form in simple_provider_forms() {
+            let rule = PRESET_RULES.iter().find(|rule| rule.app_id == form.app_id);
+            let has_routok = form.presets.iter().any(|preset| preset.id == "routok");
+            match rule {
+                Some(rule) => {
+                    assert_eq!(form.presets[0].id, "routok", "{}", form.app_id);
+                    assert_eq!(form.presets[0].base_url, rule.routok.base_url);
+                    assert_eq!(form.presets[0].model, rule.routok.model);
+                    assert_eq!(form.presets.iter().filter(|p| p.id == "routok").count(), 1);
+                    for hidden in rule.hidden {
+                        assert!(
+                            form.presets.iter().all(|preset| preset.id != *hidden),
+                            "{} still lists {hidden}",
+                            form.app_id
+                        );
+                    }
+                }
+                None => assert!(!has_routok, "{}", form.app_id),
+            }
+        }
+        let codex = simple_provider_form_for("codex").expect("codex form");
+        assert_eq!(codex.presets.len(), 1);
+        assert_eq!(codex.presets[0].base_url, "https://api.routok.com/v1");
+        assert_eq!(codex.presets[0].model, "gpt-6.1-sol");
+        for app_id in ["gemini", "grokbuild"] {
+            let form = simple_provider_form_for(app_id).expect("form");
+            assert_eq!(form.presets.len(), 1, "{app_id}");
+            assert_eq!(form.presets[0].base_url, "https://api.routok.com/v1");
+            assert_eq!(form.presets[0].model, "", "{app_id}");
+        }
+        for app_id in ["opencode", "pi", "openclaw", "hermes"] {
+            let form = simple_provider_form_for(app_id).expect("form");
+            assert_eq!(form.presets.len(), 1, "{app_id}");
+            assert_eq!(form.presets[0].base_url, "https://api.routok.com/v1");
+            assert_eq!(form.presets[0].model, "gpt-6.1-sol", "{app_id}");
+        }
+        let claude = simple_provider_form_for("claude").expect("claude form");
+        assert_eq!(claude.presets.len(), 1);
+        assert!(simple_provider_form_for("claude-desktop").is_some());
+    }
 
     #[test]
     fn host_adapters_cover_every_core_application() {

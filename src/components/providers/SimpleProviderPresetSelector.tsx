@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpAZ, Search } from "lucide-react";
 
+import { useI18n } from "../../lib/i18n";
 import type { SimpleProviderPreset } from "../../lib/provider-types";
 import { ProviderIcon } from "../ProviderIcon";
 import { Button } from "../ui/button";
@@ -17,6 +18,7 @@ export function SimpleProviderPresetSelector({
   selectedId,
   onSelect,
 }: SimpleProviderPresetSelectorProps) {
+  const { t } = useI18n();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [alphabetical, setAlphabetical] = useState(false);
@@ -42,15 +44,15 @@ export function SimpleProviderPresetSelector({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">Provider preset</span>
+        <span className="text-sm font-medium">{t("Provider preset")}</span>
         <div className="flex items-center gap-2">
           {searchOpen && (
             <Input
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search presets…"
-              aria-label="Search provider presets"
+              placeholder={t("Search presets…")}
+              aria-label={t("Search provider presets")}
               className="h-8 w-60"
             />
           )}
@@ -59,7 +61,7 @@ export function SimpleProviderPresetSelector({
             variant="ghost"
             size="icon"
             className={searchOpen ? "size-8 bg-accent" : "size-8"}
-            aria-label="Search provider presets"
+            aria-label={t("Search provider presets")}
             aria-pressed={searchOpen}
             onClick={() => {
               setSearchOpen((current) => !current);
@@ -73,7 +75,7 @@ export function SimpleProviderPresetSelector({
             variant="ghost"
             size="icon"
             className={alphabetical ? "size-8 bg-accent" : "size-8"}
-            aria-label="Toggle preset sorting"
+            aria-label={t("Toggle preset sorting")}
             aria-pressed={alphabetical}
             onClick={() => setAlphabetical((current) => !current)}
           >
@@ -84,7 +86,7 @@ export function SimpleProviderPresetSelector({
 
       <div
         role="group"
-        aria-label="Provider presets"
+        aria-label={t("Provider presets")}
         className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2"
       >
         <button
@@ -94,7 +96,7 @@ export function SimpleProviderPresetSelector({
           onClick={() => onSelect(null)}
         >
           <span className="size-4" aria-hidden="true" />
-          <span className="truncate">Custom</span>
+          <span className="truncate">{t("Custom")}</span>
         </button>
         {visiblePresets.map((preset) => (
           <button
@@ -116,12 +118,12 @@ export function SimpleProviderPresetSelector({
         ))}
         {visiblePresets.length === 0 && (
           <div className="col-span-full rounded-md border border-dashed border-border-default px-3 py-2 text-xs text-muted-foreground">
-            No matching presets.
+            {t("No matching presets.")}
           </div>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Choose a preset, then adjust the fields below if needed.
+        {t("Choose a preset, then adjust the fields below if needed.")}
       </p>
     </div>
   );

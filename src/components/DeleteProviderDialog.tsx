@@ -1,6 +1,7 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 
 import type { ProviderRecord } from "../lib/provider-types";
+import { useI18n } from "../lib/i18n";
 import { useModalDialog } from "../lib/use-modal-dialog";
 import { Button } from "./ui/button";
 
@@ -19,6 +20,7 @@ export function DeleteProviderDialog({
   onCancel,
   onConfirm,
 }: DeleteProviderDialogProps) {
+  const { t } = useI18n();
   const dialogRef = useModalDialog({ busy, onCancel });
 
   return (
@@ -41,7 +43,7 @@ export function DeleteProviderDialog({
             className="flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight"
           >
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Delete provider?
+            {t("Delete provider?")}
           </h2>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 pt-3 text-center sm:text-left">
@@ -49,8 +51,10 @@ export function DeleteProviderDialog({
             id="delete-dialog-description"
             className="break-words whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
           >
-            {provider.name} will be removed from the provider catalog. Live
-            configuration is not touched.
+            {t(
+              "{name} will be removed from the provider catalog. Live configuration is not touched.",
+              { name: provider.name },
+            )}
           </p>
           {error && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-300">
@@ -67,7 +71,7 @@ export function DeleteProviderDialog({
             disabled={busy}
             onClick={onCancel}
           >
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button
             type="button"
@@ -76,7 +80,7 @@ export function DeleteProviderDialog({
             onClick={onConfirm}
           >
             {busy && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-            {busy ? "Deleting…" : "Delete provider"}
+            {busy ? t("Deleting…") : t("Delete provider")}
           </Button>
         </div>
       </div>

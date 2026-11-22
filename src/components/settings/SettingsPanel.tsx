@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Languages, Monitor, Moon, Sun } from "lucide-react";
 
 import packageInfo from "../../../package.json";
 import appIcon from "../../assets/app-icon.svg";
 import { appDefinition } from "../../lib/apps";
+import { useI18n } from "../../lib/i18n";
 import {
   appIsVisible,
   type AppVisibility,
@@ -35,6 +36,7 @@ export function SettingsPanel({
   onThemeChange,
   onAppVisibilityChange,
 }: SettingsPanelProps) {
+  const { language, setLanguage, t } = useI18n();
   const [tab, setTab] = useState<SettingsTab>("general");
   const reduceMotion = useReducedMotion();
   const panelDuration = reduceMotion ? 0 : 0.3;
@@ -74,7 +76,7 @@ export function SettingsPanel({
     <div className="flex h-full flex-col overflow-hidden px-6">
       <div
         role="tablist"
-        aria-label="Settings sections"
+        aria-label={t("Settings sections")}
         className="mb-6 grid w-full grid-cols-2 items-center justify-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground glass"
       >
         {SETTINGS_TABS.map((item) => (
@@ -96,7 +98,7 @@ export function SettingsPanel({
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
           >
-            {item === "general" ? "General" : "About"}
+            {item === "general" ? t("General") : t("About")}
           </button>
         ))}
       </div>
@@ -114,8 +116,8 @@ export function SettingsPanel({
               className="mt-0 space-y-6"
             >
               <SettingsSection
-                title="Appearance"
-                description="Use a light, dark, or system-matched theme."
+                title={t("Appearance")}
+                description={t("Use a light, dark, or system-matched theme.")}
               >
                 <div className="inline-flex gap-1 rounded-md border border-border-default bg-background p-1">
                   <ThemeButton
@@ -123,28 +125,56 @@ export function SettingsPanel({
                     icon={Sun}
                     onClick={() => onThemeChange("light")}
                   >
-                    Light
+                    {t("Light")}
                   </ThemeButton>
                   <ThemeButton
                     active={theme === "dark"}
                     icon={Moon}
                     onClick={() => onThemeChange("dark")}
                   >
-                    Dark
+                    {t("Dark")}
                   </ThemeButton>
                   <ThemeButton
                     active={theme === "system"}
                     icon={Monitor}
                     onClick={() => onThemeChange("system")}
                   >
-                    System
+                    {t("System")}
                   </ThemeButton>
                 </div>
               </SettingsSection>
 
               <SettingsSection
-                title="Visible applications"
-                description="Choose which applications appear in the provider switcher. At least one stays visible."
+                title={t("Language")}
+                description={t("Choose the display language of the interface.")}
+              >
+                <div
+                  role="group"
+                  aria-label={t("Language")}
+                  className="inline-flex gap-1 rounded-md border border-border-default bg-background p-1"
+                >
+                  <ThemeButton
+                    active={language === "en"}
+                    icon={Languages}
+                    onClick={() => setLanguage("en")}
+                  >
+                    English
+                  </ThemeButton>
+                  <ThemeButton
+                    active={language === "zh"}
+                    icon={Languages}
+                    onClick={() => setLanguage("zh")}
+                  >
+                    中文
+                  </ThemeButton>
+                </div>
+              </SettingsSection>
+
+              <SettingsSection
+                title={t("Visible applications")}
+                description={t(
+                  "Choose which applications appear in the provider switcher. At least one stays visible.",
+                )}
               >
                 <div className="flex flex-wrap gap-1 rounded-md border border-border-default bg-background p-1">
                   {apps.map((app) => {
@@ -158,7 +188,12 @@ export function SettingsPanel({
                         variant={visible ? "default" : "ghost"}
                         disabled={visible && visibleCount <= 1}
                         aria-pressed={visible}
-                        aria-label={`${visible ? "Hide" : "Show"} ${definition.label} in application switcher`}
+                        aria-label={t(
+                          visible
+                            ? "Hide {app} in application switcher"
+                            : "Show {app} in application switcher",
+                          { app: definition.label },
+                        )}
                         onClick={() => toggleApp(app.id)}
                         className={cn(
                           "w-auto min-w-[90px] gap-1.5 px-3",
@@ -190,9 +225,9 @@ export function SettingsPanel({
               className="mt-0 space-y-6"
             >
               <header className="space-y-1">
-                <h2 className="text-sm font-medium">About</h2>
+                <h2 className="text-sm font-medium">{t("About")}</h2>
                 <p className="text-xs text-muted-foreground">
-                  Version and project information.
+                  {t("Version and project information.")}
                 </p>
               </header>
               <motion.div
@@ -209,15 +244,20 @@ export function SettingsPanel({
                     <div className="flex items-center gap-2">
                       <img src={appIcon} alt="" className="h-5 w-5" />
                       <h3 className="text-lg font-semibold text-foreground">
-                        CC Switch Lite
+                        Token Router
                       </h3>
                     </div>
                     <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/80 px-2.5 py-1 text-xs">
-                      <span className="text-muted-foreground">Version</span>
+                      <span className="text-muted-foreground">
+                        {t("Version")}
+                      </span>
                       <span className="font-medium">
                         v{packageInfo.version}
                       </span>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("Copyright: routok.com")}
+                    </p>
                   </div>
                 </div>
               </motion.div>

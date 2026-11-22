@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Search, X } from "lucide-react";
 
+import { useI18n } from "../../lib/i18n";
 import type { AppId, ProviderRecord } from "../../lib/provider-types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -60,6 +61,7 @@ export function ProviderList({
   const searchOwnerRef = useRef<HTMLElement | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
+  const { t } = useI18n();
   const closeSearch = useCallback(() => {
     setIsSearchOpen(false);
     setSearchTerm("");
@@ -124,10 +126,10 @@ export function ProviderList({
       <div
         role="status"
         aria-live="polite"
-        aria-label="Loading providers"
+        aria-label={t("Loading providers")}
         className="space-y-3"
       >
-        <span className="sr-only">Loading providers</span>
+        <span className="sr-only">{t("Loading providers")}</span>
         {[0, 1, 2].map((index) => (
           <div
             key={index}
@@ -143,7 +145,9 @@ export function ProviderList({
     return (
       <ProviderEmptyState
         title={emptyTitle}
-        description="Add one manually, or import the API provider from your current live configuration."
+        description={t(
+          "Add one manually, or import the API provider from your current live configuration.",
+        )}
         importLabel={importLabel}
         disabled={disabled}
         importDisabled={importDisabled}
@@ -155,7 +159,11 @@ export function ProviderList({
   }
 
   return (
-    <section ref={sectionRef} className="mt-4 space-y-4" aria-label="Providers">
+    <section
+      ref={sectionRef}
+      className="mt-4 space-y-4"
+      aria-label={t("Providers")}
+    >
       <AnimatePresence>
         {isSearchOpen && (
           <motion.div
@@ -173,8 +181,8 @@ export function ProviderList({
                   ref={searchInputRef}
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search name, notes, or URL…"
-                  aria-label="Search providers"
+                  placeholder={t("Search name, notes, or URL…")}
+                  aria-label={t("Search providers")}
                   className="pl-9 pr-16"
                 />
                 {searchTerm && (
@@ -184,7 +192,7 @@ export function ProviderList({
                     className="absolute right-11 top-1/2 -translate-y-1/2 text-xs"
                     onClick={() => setSearchTerm("")}
                   >
-                    Clear
+                    {t("Clear")}
                   </Button>
                 )}
                 <Button
@@ -192,14 +200,14 @@ export function ProviderList({
                   size="icon"
                   className="ml-auto"
                   onClick={closeSearch}
-                  aria-label="Close provider search"
+                  aria-label={t("Close provider search")}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                <span>Matches provider name, notes, and URL.</span>
-                <span>Press Esc to close</span>
+                <span>{t("Matches provider name, notes, and URL.")}</span>
+                <span>{t("Press Esc to close")}</span>
               </div>
             </div>
           </motion.div>
@@ -208,7 +216,7 @@ export function ProviderList({
 
       {filteredItems.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">
-          No providers match your search.
+          {t("No providers match your search.")}
         </div>
       ) : (
         <div className="space-y-3">

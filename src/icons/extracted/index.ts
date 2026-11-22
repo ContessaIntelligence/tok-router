@@ -21,6 +21,7 @@ import _pateway from "./pateway.jpg";
 import _pipellm from "./pipellm.png";
 import _qiniu from "./qiniu.png";
 import _relaxcode from "./relaxcode.png";
+import _routok from "./routok.svg?url";
 import _runapi from "./runapi.jpg";
 import _shengsuanyun from "./shengsuanyun.svg?url";
 import _subrouter from "./subrouter.svg?url";
@@ -131,6 +132,7 @@ export const iconUrls: Record<string, string> = {
   pipellm: _pipellm,
   qiniu: _qiniu,
   relaxcode: _relaxcode,
+  routok: _routok,
   runapi: _runapi,
   shengsuanyun: _shengsuanyun,
   subrouter: _subrouter,

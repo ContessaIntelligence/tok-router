@@ -9,6 +9,7 @@ import {
   type McpFormValue,
   type McpServer,
 } from "../../lib/mcp-types";
+import { useI18n } from "../../lib/i18n";
 import type { AppId, CoreAppDescriptor } from "../../lib/provider-types";
 import { cn } from "../../lib/utils";
 import { FullScreenPanel } from "../FullScreenPanel";
@@ -67,6 +68,7 @@ export function McpDialog({
   onCancel,
   onSave,
 }: McpDialogProps) {
+  const { t } = useI18n();
   const editing = server !== undefined;
   const [base, setBase] = useState<McpServer | undefined>(server);
   const [form, setForm] = useState<McpFormValue>(() =>
@@ -103,29 +105,30 @@ export function McpDialog({
 
   const submit = () => {
     const id = form.id.trim();
-    if (!id) return setValidationError("Server ID is required.");
-    if (duplicate) return setValidationError("That server ID already exists.");
+    if (!id) return setValidationError(t("Server ID is required."));
+    if (duplicate)
+      return setValidationError(t("That server ID already exists."));
     if (form.transport === "stdio" && !form.command.trim()) {
-      return setValidationError("Command is required for a stdio server.");
+      return setValidationError(t("Command is required for a stdio server."));
     }
     if (form.transport !== "stdio" && !form.url.trim()) {
-      return setValidationError("URL is required for a remote server.");
+      return setValidationError(t("URL is required for a remote server."));
     }
     try {
       setValidationError(null);
       onSave(formToServer(form, base));
     } catch (caught) {
       setValidationError(
-        caught instanceof Error ? caught.message : "The server is invalid.",
+        caught instanceof Error ? caught.message : t("The server is invalid."),
       );
     }
   };
 
   return (
     <FullScreenPanel
-      title={editing ? "Edit MCP" : "Add MCP"}
+      title={editing ? t("Edit MCP") : t("Add MCP")}
       titleId="mcp-editor-title"
-      closeLabel="Close MCP editor"
+      closeLabel={t("Close MCP editor")}
       busy={busy}
       onClose={onCancel}
       footer={
@@ -137,7 +140,7 @@ export function McpDialog({
           ) : (
             <Plus className="mr-2 h-4 w-4" />
           )}
-          {busy ? "Saving…" : editing ? "Save" : "Add"}
+          {busy ? t("Saving…") : editing ? t("Save") : t("Add")}
         </Button>
       }
     >
@@ -145,11 +148,11 @@ export function McpDialog({
         <section className="glass flex-shrink-0 space-y-6 rounded-xl border border-white/10 p-6">
           {!editing && (
             <div>
-              <h3 className="mb-3 text-sm font-medium">Preset</h3>
+              <h3 className="mb-3 text-sm font-medium">{t("Preset")}</h3>
               <div
                 className="flex flex-wrap gap-2"
                 role="group"
-                aria-label="MCP preset"
+                aria-label={t("MCP preset")}
               >
                 <button
                   type="button"
@@ -162,7 +165,7 @@ export function McpDialog({
                       : "bg-accent text-muted-foreground hover:bg-accent/80",
                   )}
                 >
-                  Custom
+                  {t("Custom")}
                 </button>
                 {MCP_PRESETS.map((preset) => (
                   <button
@@ -190,7 +193,7 @@ export function McpDialog({
               htmlFor="mcp-server-id"
               className="mb-2 block text-sm font-medium"
             >
-              Server ID <span className="text-red-500">*</span>
+              {t("Server ID")} <span className="text-red-500">*</span>
             </label>
             <Input
               id="mcp-server-id"
@@ -206,7 +209,7 @@ export function McpDialog({
               htmlFor="mcp-server-name"
               className="mb-2 block text-sm font-medium"
             >
-              Name
+              {t("Name")}
             </label>
             <Input
               id="mcp-server-name"
@@ -218,7 +221,9 @@ export function McpDialog({
           </div>
 
           <div>
-            <p className="mb-3 text-sm font-medium">Enabled applications</p>
+            <p className="mb-3 text-sm font-medium">
+              {t("Enabled applications")}
+            </p>
             <div className="flex flex-wrap gap-4">
               {apps.map((app) => {
                 const definition = appDefinition(app.id, [app]);
@@ -254,11 +259,11 @@ export function McpDialog({
 
         <section className="glass flex min-h-0 flex-1 flex-col space-y-5 rounded-xl border border-white/10 p-6">
           <div>
-            <p className="mb-3 text-sm font-medium">Connection</p>
+            <p className="mb-3 text-sm font-medium">{t("Connection")}</p>
             <div
               className="inline-flex rounded-lg bg-muted p-1"
               role="group"
-              aria-label="MCP transport"
+              aria-label={t("MCP transport")}
             >
               {(["stdio", "http", "sse"] as const).map((transport) => (
                 <button
@@ -283,7 +288,7 @@ export function McpDialog({
           {form.transport === "stdio" ? (
             <>
               <label className="block space-y-2 text-sm font-medium">
-                <span>Command *</span>
+                <span>{t("Command *")}</span>
                 <Input
                   value={form.command}
                   disabled={busy}
@@ -293,42 +298,40 @@ export function McpDialog({
               </label>
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="space-y-2 text-sm font-medium">
-                  <span>Arguments</span>
+                  <span>{t("Arguments")}</span>
                   <Textarea
                     value={form.args}
                     disabled={busy}
                     onChange={(event) => update("args", event.target.value)}
-                    placeholder={
-                      "One argument per line\n-y\n@upstash/context7-mcp"
-                    }
+                    placeholder={`${t("One argument per line")}\n-y\n@upstash/context7-mcp`}
                     rows={6}
                   />
                 </label>
                 <label className="space-y-2 text-sm font-medium">
-                  <span>Environment</span>
+                  <span>{t("Environment")}</span>
                   <Textarea
                     value={form.env}
                     disabled={busy}
                     onChange={(event) => update("env", event.target.value)}
-                    placeholder={"One KEY=VALUE per line"}
+                    placeholder={t("One KEY=VALUE per line")}
                     rows={6}
                   />
                 </label>
               </div>
               <label className="block space-y-2 text-sm font-medium">
-                <span>Working directory</span>
+                <span>{t("Working directory")}</span>
                 <Input
                   value={form.cwd}
                   disabled={busy}
                   onChange={(event) => update("cwd", event.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("Optional")}
                 />
               </label>
             </>
           ) : (
             <>
               <label className="block space-y-2 text-sm font-medium">
-                <span>URL *</span>
+                <span>{t("URL *")}</span>
                 <Input
                   type="url"
                   value={form.url}
@@ -338,12 +341,12 @@ export function McpDialog({
                 />
               </label>
               <label className="block space-y-2 text-sm font-medium">
-                <span>Headers</span>
+                <span>{t("Headers")}</span>
                 <Textarea
                   value={form.headers}
                   disabled={busy}
                   onChange={(event) => update("headers", event.target.value)}
-                  placeholder={"One KEY=VALUE per line"}
+                  placeholder={t("One KEY=VALUE per line")}
                   rows={6}
                 />
               </label>

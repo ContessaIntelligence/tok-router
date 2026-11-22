@@ -8,6 +8,7 @@ import type {
   SimpleProviderFormDescriptor,
   SimpleProviderValues,
 } from "../lib/provider-types";
+import { useI18n } from "../lib/i18n";
 import { FullScreenPanel } from "./FullScreenPanel";
 import { SimpleProviderPresetSelector } from "./providers/SimpleProviderPresetSelector";
 import { Button } from "./ui/button";
@@ -69,7 +70,8 @@ export function ProviderDialog({
   const [name, setName] = useState(provider?.name ?? "");
   const [values, setValues] = useState(() => initialValues(provider));
   const [selectedPresetId, setSelectedPresetId] = useState("custom");
-  const title = provider ? "Edit Provider" : "Add New Provider";
+  const { t } = useI18n();
+  const title = provider ? t("Edit Provider") : t("Add New Provider");
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,7 +88,7 @@ export function ProviderDialog({
     <FullScreenPanel
       title={title}
       titleId="provider-dialog-title"
-      closeLabel="Close provider dialog"
+      closeLabel={t("Close provider dialog")}
       busy={busy}
       onClose={onCancel}
       contentClassName={provider ? undefined : "pt-3"}
@@ -95,8 +97,9 @@ export function ProviderDialog({
           {!provider && (
             <>
               <span className="mr-auto min-w-0 truncate text-xs text-muted-foreground">
-                💡 After choosing a preset, fill in the fields below (e.g. API
-                Key)
+                {t(
+                  "💡 After choosing a preset, fill in the fields below (e.g. API Key)",
+                )}
               </span>
               <Button
                 variant="outline"
@@ -104,7 +107,7 @@ export function ProviderDialog({
                 disabled={busy}
                 className="border-border/20 hover:bg-accent hover:text-accent-foreground"
               >
-                Cancel
+                {t("Cancel")}
               </Button>
             </>
           )}
@@ -121,7 +124,7 @@ export function ProviderDialog({
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
-            {busy ? "Saving…" : provider ? "Save" : "Add"}
+            {busy ? t("Saving…") : provider ? t("Save") : t("Add")}
           </Button>
         </>
       }
@@ -149,7 +152,7 @@ export function ProviderDialog({
         )}
 
         <label className="block space-y-2 text-sm font-medium">
-          <span>Provider name</span>
+          <span>{t("Provider name")}</span>
           <Input
             autoFocus
             required
@@ -174,10 +177,10 @@ export function ProviderDialog({
           return (
             <div key={field.key} className="space-y-2">
               <label htmlFor={inputId} className="block text-sm font-medium">
-                {copy.label}
+                {t(copy.label)}
                 {!required && (
                   <span className="ml-1 font-normal text-muted-foreground">
-                    Optional
+                    {t("Optional")}
                   </span>
                 )}
               </label>
@@ -193,15 +196,15 @@ export function ProviderDialog({
                     [field.key]: event.target.value,
                   }))
                 }
-                placeholder={copy.placeholder}
+                placeholder={t(copy.placeholder)}
               />
               <p
                 id={helpId}
                 className="text-xs font-normal leading-5 text-muted-foreground"
               >
                 {keepsExistingEnvironmentCredential
-                  ? "Leave blank to keep the existing environment credential."
-                  : copy.help}
+                  ? t("Leave blank to keep the existing environment credential.")
+                  : t(copy.help)}
               </p>
             </div>
           );

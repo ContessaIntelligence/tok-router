@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { useI18n } from "../../lib/i18n";
 import { errorMessage } from "../../lib/providers";
 import { mcpApi } from "../../lib/mcp";
 import type { McpServer } from "../../lib/mcp-types";
@@ -59,6 +60,7 @@ function searchText(server: McpServer): string {
 
 export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
   function McpPanel({ apps, onInteractionBlockedChange }, ref) {
+    const { t } = useI18n();
     const [servers, setServers] = useState<McpServer[]>([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -114,12 +116,31 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
           report.newServers + report.enabledApps + report.disabledApps;
         setNotice(
           changed === 0
-            ? "No new MCP servers were found."
-            : `Imported ${report.newServers} server${report.newServers === 1 ? "" : "s"}; enabled ${report.enabledApps} and disabled ${report.disabledApps} existing application link${report.enabledApps + report.disabledApps === 1 ? "" : "s"}.`,
+            ? t("No new MCP servers were found.")
+            : t(
+                "Imported {servers}; enabled {enabled} and disabled {disabled} existing {links}.",
+                {
+                  servers: t(
+                    report.newServers === 1
+                      ? "{count} server"
+                      : "{count} servers",
+                    { count: report.newServers },
+                  ),
+                  enabled: report.enabledApps,
+                  disabled: report.disabledApps,
+                  links: t(
+                    report.enabledApps + report.disabledApps === 1
+                      ? "application link"
+                      : "application links",
+                  ),
+                },
+              ),
         );
         if (report.failedApps.length > 0) {
           setError(
-            `Some applications could not be imported: ${report.failedApps.join("; ")}`,
+            t("Some applications could not be imported: {apps}", {
+              apps: report.failedApps.join("; "),
+            }),
           );
         }
       } catch (caught) {
@@ -148,7 +169,9 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
         await refreshServers();
         setEditing(null);
         setNotice(
-          editing === "new" ? "MCP server added." : "MCP server updated.",
+          editing === "new"
+            ? t("MCP server added.")
+            : t("MCP server updated."),
         );
       } catch (caught) {
         setError(errorMessage(caught));
@@ -184,7 +207,7 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
           current.filter((item) => item.id !== deleting.id),
         );
         setDeleting(null);
-        setNotice("MCP server deleted.");
+        setNotice(t("MCP server deleted."));
       } catch (caught) {
         setError(errorMessage(caught));
       } finally {
@@ -216,7 +239,12 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6">
         <AppCountBar
-          totalLabel={`${servers.length} MCP server${servers.length === 1 ? "" : "s"} configured`}
+          totalLabel={t(
+            servers.length === 1
+              ? "{count} MCP server configured"
+              : "{count} MCP servers configured",
+            { count: servers.length },
+          )}
           counts={counts}
           apps={apps}
         />
@@ -224,9 +252,9 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
         <ManagementListSearch
           value={search}
           onValueChange={setSearch}
-          placeholder="Search MCP name, description, tag, or command..."
-          ariaLabel="Search managed MCP servers"
-          clearLabel="Clear MCP search"
+          placeholder={t("Search MCP name, description, tag, or command...")}
+          ariaLabel={t("Search managed MCP servers")}
+          clearLabel={t("Clear MCP search")}
         />
 
         {(error || notice) && (
@@ -261,16 +289,19 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   <Server className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <h2 className="text-lg font-medium">No servers yet</h2>
+                <h2 className="text-lg font-medium">{t("No servers yet")}</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Click the button in the top right to add your first MCP
-                  server.
+                  {t(
+                    "Click the button in the top right to add your first MCP server.",
+                  )}
                 </p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
                 <Search className="mb-4 h-10 w-10 opacity-40" />
-                <p className="text-sm">No MCP servers match your search</p>
+                <p className="text-sm">
+                  {t("No MCP servers match your search")}
+                </p>
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border-default">
@@ -303,7 +334,12 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
                       })}
                       onToggle={(appId) => void toggle(server, appId)}
                       ariaLabel={(_, state, label) =>
-                        `${state.enabled ? "Disable" : "Enable"} ${server.name || server.id} for ${label}`
+                        t(
+                          state.enabled
+                            ? "Disable {name} for {app}"
+                            : "Enable {name} for {app}",
+                          { name: server.name || server.id, app: label },
+                        )
                       }
                       disabled={blocked}
                     />
@@ -317,7 +353,9 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
                           setError(null);
                           setEditing(server);
                         }}
-                        aria-label={`Edit ${server.name || server.id}`}
+                        aria-label={t("Edit {name}", {
+                          name: server.name || server.id,
+                        })}
                       >
                         <Edit3 className="h-3.5 w-3.5" />
                       </Button>
@@ -330,7 +368,9 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
                           setError(null);
                           setDeleting(server);
                         }}
-                        aria-label={`Delete ${server.name || server.id}`}
+                        aria-label={t("Delete {name}", {
+                          name: server.name || server.id,
+                        })}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

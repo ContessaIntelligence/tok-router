@@ -1,6 +1,7 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 
 import type { McpServer } from "../../lib/mcp-types";
+import { useI18n } from "../../lib/i18n";
 import { useModalDialog } from "../../lib/use-modal-dialog";
 import { Button } from "../ui/button";
 
@@ -19,6 +20,7 @@ export function DeleteMcpDialog({
   onCancel,
   onConfirm,
 }: DeleteMcpDialogProps) {
+  const { t } = useI18n();
   const dialogRef = useModalDialog({ busy, onCancel });
   return (
     <dialog
@@ -39,14 +41,16 @@ export function DeleteMcpDialog({
           className="flex items-center gap-2 text-lg font-semibold"
         >
           <AlertTriangle className="h-5 w-5 text-destructive" />
-          Delete MCP server?
+          {t("Delete MCP server?")}
         </h2>
         <p
           id="delete-mcp-description"
           className="mt-3 text-sm text-muted-foreground"
         >
-          {server.name} will be removed from the shared catalog and from every
-          application where it is enabled.
+          {t(
+            "{name} will be removed from the shared catalog and from every application where it is enabled.",
+            { name: server.name },
+          )}
         </p>
         {error && (
           <p role="alert" className="mt-3 text-sm text-red-600">
@@ -55,11 +59,11 @@ export function DeleteMcpDialog({
         )}
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" disabled={busy} onClick={onCancel}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button variant="destructive" disabled={busy} onClick={onConfirm}>
             {busy && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-            {busy ? "Deleting…" : "Delete server"}
+            {busy ? t("Deleting…") : t("Delete server")}
           </Button>
         </div>
       </div>

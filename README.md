@@ -1,8 +1,8 @@
-# CC Switch Lite
+# Token Router
 
 A provider configuration editor for every application supported by CC Switch.
 
-CC Switch Lite uses
+Token Router uses
 [`cc-switch-core`](https://github.com/SaladDay/cc-switch-core) as its built-in
 application registry and native Import/Apply/Remove domain layer. Core also
 declares shared default config roots. Lite retains settings and environment

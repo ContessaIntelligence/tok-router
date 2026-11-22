@@ -1,8 +1,8 @@
 {
-  "name": "cc-switch-lite",
+  "name": "token-router",
   "private": true,
   "version": "0.1.0-alpha.1",
-  "description": "A provider configuration editor for CC Switch applications",
+  "description": "Token Router - a provider configuration editor",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

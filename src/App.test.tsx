@@ -536,7 +536,7 @@ describe("App", () => {
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Add Claude Code provider" }),
+      screen.getByRole("button", { name: "Add Routok Key for Claude Code" }),
     ).toBeDisabled();
     expect(
       screen.getByRole("button", {
@@ -559,7 +559,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Work" })).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Add Claude Code provider" }),
+      screen.getByRole("button", { name: "Add Routok Key for Claude Code" }),
     ).toBeEnabled();
     const editButton = screen.getByRole("button", { name: "Edit Work" });
     expect(editButton).toBeEnabled();
@@ -589,7 +589,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Work" })).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Add Claude Code provider" }),
+      screen.getByRole("button", { name: "Add Routok Key for Claude Code" }),
     ).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Switch to Work" }),
@@ -824,7 +824,7 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Claude Code provider" }),
+      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Add New Provider" });
     await user.type(within(dialog).getByLabelText("Provider name"), "Work");
@@ -848,7 +848,7 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Claude Code provider" }),
+      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
     );
     expect(screen.getByText("Provider preset")).toBeVisible();
     expect(screen.getByLabelText("API key")).toBeVisible();
@@ -865,7 +865,7 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Claude Code provider" }),
+      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Add New Provider" });
     await user.type(within(dialog).getByLabelText("API key"), "private-key");
@@ -999,7 +999,7 @@ describe("App", () => {
     ).toBeVisible();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Add Claude Code provider" }),
+        screen.getByRole("button", { name: "Add Routok Key for Claude Code" }),
       ).toHaveFocus(),
     );
   });
@@ -1087,7 +1087,7 @@ describe("App", () => {
       }),
     ).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Work is now the Claude Code user default. Project, local, or managed settings can override it.",
+      "Work is now the Claude Code user default. Project, local, or managed settings can override it. Restart Claude Code to use it.",
     );
   });
 
@@ -1314,7 +1314,7 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Gemini CLI provider" }),
+      await screen.findByRole("button", { name: "Add Routok Key for Gemini CLI" }),
     );
     await user.type(screen.getByLabelText("Provider name"), "Gemini Work");
     await user.type(
@@ -1451,7 +1451,7 @@ describe("App", () => {
     render(<App />);
 
     const trigger = await screen.findByRole("button", {
-      name: "Add Claude Code provider",
+      name: "Add Routok Key for Claude Code",
     });
     await user.click(trigger);
     const providerDialog = screen.getByRole("dialog", {
@@ -1512,7 +1512,7 @@ describe("App", () => {
     );
     await user.click(screen.getByRole("tab", { name: "About" }));
     expect(
-      screen.getByRole("heading", { name: "CC Switch Lite" }),
+      screen.getByRole("heading", { name: "Token Router" }),
     ).toBeVisible();
     expect(screen.getByText("v0.1.0-alpha.1")).toBeVisible();
     expect(
@@ -1540,5 +1540,37 @@ describe("App", () => {
     expect(
       screen.queryByRole("button", { name: "Open plugin marketplace" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("switches the interface language from settings and remembers it", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(screen.getByRole("button", { name: "中文" }));
+
+    expect(screen.getByRole("heading", { name: "设置" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "常规" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "深色" })).toBeVisible();
+    expect(window.localStorage.getItem("cc-switch-lite:language")).toBe("zh");
+    expect(document.documentElement.lang).toBe("zh-CN");
+
+    await user.click(screen.getByRole("tab", { name: "关于" }));
+    expect(screen.getByText("版权所有：routok.com")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "返回供应商列表" }));
+    expect(
+      await screen.findByRole("heading", {
+        name: "添加你的第一个 Claude Code 供应商",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getAllByRole("button", { name: "添加 Routok Key" }).length,
+    ).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "打开设置" }));
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeVisible();
+    expect(window.localStorage.getItem("cc-switch-lite:language")).toBe("en");
   });
 });

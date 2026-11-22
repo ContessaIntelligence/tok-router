@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CC Switch Lite">
-  <defs>
-    <linearGradient id="background" x1="48" y1="40" x2="464" y2="472" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#38a1ff" />
-      <stop offset="1" stop-color="#0878f9" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="120" fill="url(#background)" />
-  <path d="M242 179c-18-22-45-35-76-35-64 0-110 48-110 112s46 112 110 112c31 0 58-13 76-35l-34-30c-10 13-24 21-42 21-35 0-60-29-60-68s25-68 60-68c18 0 32 8 42 21l34-30Z" fill="white" />
-  <path d="M456 179c-18-22-45-35-76-35-64 0-110 48-110 112s46 112 110 112c31 0 58-13 76-35l-34-30c-10 13-24 21-42 21-35 0-60-29-60-68s25-68 60-68c18 0 32 8 42 21l34-30Z" fill="white" />
-  <circle cx="256" cy="424" r="20" fill="#ff9b37" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Token Router"><rect x="24" y="24" width="976" height="976" rx="218" fill="#F8FAFC"/><g transform="translate(142,263) scale(1.0452)"><path fill="#37A994" d="M96 0 H436 C489 0 532 43 532 96 V142 H256 C213 142 178 177 178 220 V335 H96 C43 335 0 292 0 239 V96 C0 43 43 0 96 0 Z"/><path fill="#5681D2" d="M532 142 H612 C665 142 708 185 708 238 V380 C708 433 665 476 612 476 H274 C221 476 178 433 178 380 V335 H436 C489 335 532 292 532 239 Z"/></g></svg>
