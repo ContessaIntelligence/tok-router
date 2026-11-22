@@ -43,6 +43,7 @@ export const zhMessages: Record<string, string> = {
   "Skills Management": "技能管理",
   Settings: "设置",
   "Open settings": "打开设置",
+  "Open RouTok website": "打开 RouTok 官网",
   "Back to providers": "返回供应商列表",
   "Manage Skills": "管理技能",
   "Manage MCP servers": "管理 MCP 服务器",
@@ -74,7 +75,8 @@ export const zhMessages: Record<string, string> = {
   "Default endpoint": "默认端点",
   "Adapter unavailable": "适配器不可用",
   "{name} is in {app}": "{name} 已在 {app} 中",
-  "{name} is the Claude Code user default": "{name} 是 Claude Code 的用户默认配置",
+  "{name} is the Claude Code user default":
+    "{name} 是 Claude Code 的用户默认配置",
   "{name} is current": "{name} 为当前使用",
   Managed: "已托管",
   Remove: "移除",
@@ -161,8 +163,7 @@ export const zhMessages: Record<string, string> = {
   "{count} servers": "{count} 个服务器",
   "application link": "应用关联",
   "application links": "应用关联",
-  "Some applications could not be imported: {apps}":
-    "部分应用无法导入:{apps}",
+  "Some applications could not be imported: {apps}": "部分应用无法导入:{apps}",
   "MCP server added.": "MCP 服务器已添加。",
   "MCP server updated.": "MCP 服务器已更新。",
   "MCP server deleted.": "MCP 服务器已删除。",
@@ -206,5 +207,6 @@ export const zhMessages: Record<string, string> = {
     "此应用直接读取统一技能目录。",
   "This Skill is required by the application.": "此应用需要该技能。",
   "This Skill is disabled by the application.": "该技能已被应用停用。",
-  "This Skill is disabled outside CC Switch.": "该技能已在 CC Switch 之外被停用。",
+  "This Skill is disabled outside CC Switch.":
+    "该技能已在 CC Switch 之外被停用。",
 };

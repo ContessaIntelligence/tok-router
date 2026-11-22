@@ -179,7 +179,9 @@ export function SkillsPanel({
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <Sparkles className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h2 className="text-lg font-medium">{t("No skills installed")}</h2>
+              <h2 className="text-lg font-medium">
+                {t("No skills installed")}
+              </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {t(
                   "Skills already present in the shared catalog will appear here.",

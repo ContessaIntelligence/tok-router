@@ -1,0 +1,90 @@
+name: Build
+
+# Builds unsigned Token Router executables for Windows, Linux and macOS on every
+# push to main, on version tags, and on demand. Artifacts are attached to the run.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl wget file pkg-config \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 "${{ matrix.target }}"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "20"
+
+      - name: Enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: corepack enable && corepack install
+
+      - run: pnpm install --frozen-lockfile
+
+      # No signing: --no-bundle produces the bare executable only.
+      - name: Build executable
+        run: pnpm tauri build --no-bundle --ci --target "${{ matrix.target }}"
+
+      - name: Collect artifact
+        run: |
+          out="src-tauri/target/${{ matrix.target }}/release"
+          mkdir -p artifacts
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "$out/token-router.exe" "artifacts/token-router-${{ matrix.name }}.exe"
+          else
+            # tar keeps the executable bit, which a plain artifact upload would lose.
+            tar -czf "artifacts/token-router-${{ matrix.name }}.tar.gz" -C "$out" token-router
+          fi
+          ls -l artifacts
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: token-router-${{ matrix.name }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 30

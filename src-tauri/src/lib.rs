@@ -117,7 +117,7 @@ fn simple_provider_forms() -> &'static [SimpleProviderFormDescriptor] {
             .map(|form| {
                 let mut form = form.clone();
                 if let Some(rule) = PRESET_RULES.iter().find(|rule| rule.app_id == form.app_id) {
-                    let mut presets = vec![rule.routok.clone()];
+                    let mut presets = vec![rule.routok];
                     presets.extend(
                         form.presets
                             .iter()
@@ -141,6 +141,36 @@ fn simple_provider_form_for(app_id: &str) -> Option<&'static SimpleProviderFormD
 #[tauri::command]
 fn list_simple_provider_forms() -> Vec<SimpleProviderFormDescriptor> {
     simple_provider_forms().to_vec()
+}
+
+const ROUTOK_SITE_URL: &str = "https://api.routok.com";
+
+/// Opens the RouTok website in the default browser. The URL is fixed so the
+/// command cannot be used to launch arbitrary targets.
+#[tauri::command]
+fn open_routok_site() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = std::process::Command::new("rundll32");
+        command.args(["url.dll,FileProtocolHandler", ROUTOK_SITE_URL]);
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = std::process::Command::new("open");
+        command.arg(ROUTOK_SITE_URL);
+        command
+    };
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    let mut command = {
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(ROUTOK_SITE_URL);
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open {ROUTOK_SITE_URL}: {error}"))
 }
 
 #[derive(Debug, Serialize)]
@@ -734,6 +764,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             supported_apps,
             list_simple_provider_forms,
+            open_routok_site,
             list_provider_adapters,
             list_providers,
             create_simple_provider,

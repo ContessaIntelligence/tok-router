@@ -169,9 +169,7 @@ export const McpPanel = forwardRef<McpPanelHandle, McpPanelProps>(
         await refreshServers();
         setEditing(null);
         setNotice(
-          editing === "new"
-            ? t("MCP server added.")
-            : t("MCP server updated."),
+          editing === "new" ? t("MCP server added.") : t("MCP server updated."),
         );
       } catch (caught) {
         setError(errorMessage(caught));

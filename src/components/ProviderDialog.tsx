@@ -203,7 +203,9 @@ export function ProviderDialog({
                 className="text-xs font-normal leading-5 text-muted-foreground"
               >
                 {keepsExistingEnvironmentCredential
-                  ? t("Leave blank to keep the existing environment credential.")
+                  ? t(
+                      "Leave blank to keep the existing environment credential.",
+                    )
                   : t(copy.help)}
               </p>
             </div>

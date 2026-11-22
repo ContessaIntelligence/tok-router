@@ -46,8 +46,14 @@ vi.mock("./lib/providers", async (importOriginal) => {
   return { ...original, providersApi: api };
 });
 
+const site = vi.hoisted(() => ({ open: vi.fn() }));
+
 vi.mock("./lib/mcp", () => ({ mcpApi: mcp }));
 vi.mock("./lib/skills", () => ({ skillsApi: skills }));
+vi.mock("./lib/site", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./lib/site")>();
+  return { ...original, siteApi: site };
+});
 
 const adapters: AdapterDescriptor[] = [
   {
@@ -824,7 +830,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
+      await screen.findByRole("button", {
+        name: "Add Routok Key for Claude Code",
+      }),
     );
     const dialog = screen.getByRole("dialog", { name: "Add New Provider" });
     await user.type(within(dialog).getByLabelText("Provider name"), "Work");
@@ -848,7 +856,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
+      await screen.findByRole("button", {
+        name: "Add Routok Key for Claude Code",
+      }),
     );
     expect(screen.getByText("Provider preset")).toBeVisible();
     expect(screen.getByLabelText("API key")).toBeVisible();
@@ -865,7 +875,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Routok Key for Claude Code" }),
+      await screen.findByRole("button", {
+        name: "Add Routok Key for Claude Code",
+      }),
     );
     const dialog = screen.getByRole("dialog", { name: "Add New Provider" });
     await user.type(within(dialog).getByLabelText("API key"), "private-key");
@@ -1314,7 +1326,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(
-      await screen.findByRole("button", { name: "Add Routok Key for Gemini CLI" }),
+      await screen.findByRole("button", {
+        name: "Add Routok Key for Gemini CLI",
+      }),
     );
     await user.type(screen.getByLabelText("Provider name"), "Gemini Work");
     await user.type(
@@ -1511,9 +1525,7 @@ describe("App", () => {
       }),
     );
     await user.click(screen.getByRole("tab", { name: "About" }));
-    expect(
-      screen.getByRole("heading", { name: "Token Router" }),
-    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Token Router" })).toBeVisible();
     expect(screen.getByText("v0.1.0-alpha.1")).toBeVisible();
     expect(
       screen.queryByRole("tab", { name: "Proxy" }),
@@ -1542,11 +1554,33 @@ describe("App", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows the brand block above Settings and opens the RouTok site externally", async () => {
+    const user = userEvent.setup();
+    site.open.mockResolvedValue(undefined);
+    render(<App />);
+
+    const settings = await screen.findByRole("button", {
+      name: "Open settings",
+    });
+    expect(screen.getByText("Token Router")).toBeVisible();
+    const link = screen.getByRole("link", { name: "Open RouTok website" });
+    expect(link).toHaveTextContent("https://api.routok.com");
+    expect(link).toHaveAttribute("href", "https://api.routok.com");
+    expect(
+      link.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(link);
+    expect(site.open).toHaveBeenCalledTimes(1);
+  });
+
   it("switches the interface language from settings and remembers it", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole("button", { name: "Open settings" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Open settings" }),
+    );
     await user.click(screen.getByRole("button", { name: "中文" }));
 
     expect(screen.getByRole("heading", { name: "设置" })).toBeVisible();

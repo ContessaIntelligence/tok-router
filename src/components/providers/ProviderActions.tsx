@@ -155,7 +155,10 @@ export function ProviderActions({
           disabled={!canDelete || busy}
           title={
             isReadOnly
-              ? t("{name}: {label}", { name: providerName, label: readOnlyLabel })
+              ? t("{name}: {label}", {
+                  name: providerName,
+                  label: readOnlyLabel,
+                })
               : t("Delete {name}", { name: providerName })
           }
           aria-label={t("Delete {name}", { name: providerName })}

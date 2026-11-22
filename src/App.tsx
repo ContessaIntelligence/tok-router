@@ -61,11 +61,14 @@ import {
 } from "./lib/preferences";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { errorMessage, providersApi } from "./lib/providers";
+import { ROUTOK_SITE_URL, siteApi } from "./lib/site";
+import appIcon from "./assets/app-icon.svg";
 
 const APP_STORAGE_KEY = "cc-switch-lite:last-app";
 const VIEW_STORAGE_KEY = "cc-switch-lite:last-view";
 const DRAG_BAR_HEIGHT = 28;
 const HEADER_HEIGHT = 64;
+const BRAND_HEADER_HEIGHT = 104;
 type View = "providers" | "mcp" | "skills" | "settings";
 
 function FadePanel({
@@ -288,7 +291,9 @@ function AppContent() {
       : editing
         ? simpleForms.find((form) => form.appId === editing.appId)
         : undefined;
-  const contentTopOffset = DRAG_BAR_HEIGHT + HEADER_HEIGHT;
+  const headerHeight =
+    currentView === "providers" ? BRAND_HEADER_HEIGHT : HEADER_HEIGHT;
+  const contentTopOffset = DRAG_BAR_HEIGHT + headerHeight;
   const addActionButtonClass =
     "bg-orange-500 hover:bg-orange-600 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-500/40 rounded-full h-9 px-4 gap-1.5 whitespace-nowrap";
 
@@ -695,10 +700,13 @@ function AppContent() {
       setProviders(await providersApi.list(activeApp));
       await refreshCurrent(activeApp);
       setNotice(
-        t("{name} was removed from {app}. Restart {app} for it to take effect.", {
-          name: provider.name,
-          app: definition.label,
-        }),
+        t(
+          "{name} was removed from {app}. Restart {app} for it to take effect.",
+          {
+            name: provider.name,
+            app: definition.label,
+          },
+        ),
       );
     } catch (error) {
       setLiveError(errorMessage(error));
@@ -770,7 +778,7 @@ function AppContent() {
       <header
         className="fixed z-50 w-full bg-background/80 backdrop-blur-md transition-all duration-300"
         data-tauri-drag-region
-        style={{ top: DRAG_BAR_HEIGHT, height: HEADER_HEIGHT }}
+        style={{ top: DRAG_BAR_HEIGHT, height: headerHeight }}
       >
         <div
           className="flex h-full items-center justify-between gap-2 px-6"
@@ -781,19 +789,40 @@ function AppContent() {
             style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
           >
             {currentView === "providers" ? (
-              <Button
-                ref={settingsButtonRef}
-                variant="ghost"
-                size="sm"
-                disabled={mutationBusy || liveBusy !== null}
-                onClick={() => setCurrentView("settings")}
-                title={t("Settings")}
-                aria-label={t("Open settings")}
-                className="hover:bg-black/5 dark:hover:bg-white/5"
-              >
-                <SettingsIcon className="mr-2 h-4 w-4" />
-                {t("Settings")}
-              </Button>
+              <div className="flex flex-col items-start gap-0.5">
+                <div className="flex items-center gap-2 px-3">
+                  <img src={appIcon} alt="" className="h-6 w-6" />
+                  <span className="text-base font-semibold leading-none">
+                    Token Router
+                  </span>
+                </div>
+                <a
+                  href={ROUTOK_SITE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t("Open RouTok website")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    siteApi.open().catch(() => undefined);
+                  }}
+                  className="px-3 text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {ROUTOK_SITE_URL}
+                </a>
+                <Button
+                  ref={settingsButtonRef}
+                  variant="ghost"
+                  size="sm"
+                  disabled={mutationBusy || liveBusy !== null}
+                  onClick={() => setCurrentView("settings")}
+                  title={t("Settings")}
+                  aria-label={t("Open settings")}
+                  className="hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <SettingsIcon className="mr-2 h-4 w-4" />
+                  {t("Settings")}
+                </Button>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Button
