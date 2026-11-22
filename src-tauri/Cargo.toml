@@ -1,0 +1,36 @@
+[package]
+name = "cc-switch-lite"
+version = "0.1.0-alpha.1"
+description = "A provider configuration editor for CC Switch applications"
+license = "MIT"
+repository = "https://github.com/SaladDay/cc-switch-lite"
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+name = "cc_switch_lite_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.4.0", features = [] }
+
+[dependencies]
+cc-switch-core = { git = "https://github.com/SaladDay/cc-switch-core", rev = "7b7cfae53d997d7dd686427c3537dd359e560fe7" }
+cc-switch-store = { git = "https://github.com/SaladDay/cc-switch-core", rev = "7b7cfae53d997d7dd686427c3537dd359e560fe7" }
+hmac = "0.12"
+json5 = "0.4"
+libc = "0.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
+serde_yaml = "0.9"
+sha2 = "0.10"
+tauri = { version = "2.8.2", features = [] }
+thiserror = "2.0"
+toml_edit = "0.25"
+url = "2.5"
+uuid = { version = "1.18", features = ["v4"] }
+
+[dev-dependencies]
+fs4 = { version = "1.1", default-features = false, features = ["sync"] }
+tempfile = "3.21"

@@ -1,0 +1,905 @@
+use std::{
+    ffi::OsStr,
+    fs,
+    path::{Component, Path, PathBuf},
+    sync::{Mutex, MutexGuard},
+};
+
+use cc_switch_core::{
+    builtin_app_registry,
+    fs::{shared_live_config_lock_path, SharedLiveConfigLock, SharedLiveConfigLockError},
+    AppType, InstalledSkillSnapshot, SkillCatalogEntry, MAX_OPERATION_CONTENT_BYTES,
+};
+use serde::Deserialize;
+use thiserror::Error;
+
+use crate::{
+    mcp::{McpImportsByApp, McpLiveChange},
+    mcp_live::{McpImportSnapshot, McpLiveConfig, McpLiveReceipt},
+    native_live::NativeLiveConfig,
+    operation::{LivePaths, OperationError, OperationExecutor, OperationPlan, OperationReceipt},
+    provider::{NativeImport, ProviderRecord},
+    skill_live::{PreparedSkillChange, SkillHostError, SkillLiveConfig},
+};
+
+#[derive(Debug, Error)]
+pub enum LiveError {
+    #[error(transparent)]
+    Operation(#[from] OperationError),
+    #[error("live configuration is missing for {0}")]
+    Missing(String),
+    #[error("live configuration is invalid: {0}")]
+    InvalidConfig(String),
+    #[error("provider cannot be switched: {0}")]
+    InvalidProvider(String),
+    #[error("live configuration lock is unavailable")]
+    LockUnavailable,
+    #[error("live configuration I/O failed for {path}: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("live recovery was incomplete: {0}")]
+    Recovery(String),
+}
+
+impl LiveError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Operation(error) => error.code(),
+            Self::Missing(_) => "live_missing",
+            Self::InvalidConfig(_) => "invalid_live_config",
+            Self::InvalidProvider(_) => "invalid_provider",
+            Self::LockUnavailable => "lock_unavailable",
+            Self::Io { .. } => "live_io_error",
+            Self::Recovery(_) => "rollback_failed",
+        }
+    }
+}
+
+pub struct LiveConfig {
+    native: NativeLiveConfig,
+    mcp: McpLiveConfig,
+    home: PathBuf,
+    lock_path: PathBuf,
+    gate: Mutex<()>,
+    #[cfg(test)]
+    skill_fixture_dirs: Option<ResolvedConfigDirs>,
+}
+
+pub(crate) struct LockedLiveReceipt<'a, T> {
+    pub(crate) value: T,
+    gate: MutexGuard<'a, ()>,
+    file_lock: SharedLiveConfigLock,
+}
+
+pub(crate) type LiveWriteReceipt<'a> = LockedLiveReceipt<'a, OperationReceipt>;
+pub(crate) type McpWriteReceipt<'a> = LockedLiveReceipt<'a, McpLiveReceipt>;
+pub(crate) type McpImportObservation<'a> = LockedLiveReceipt<'a, McpImportSnapshot>;
+pub(crate) type SkillWriteReceipt<'a> = LockedLiveReceipt<'a, PreparedSkillChange>;
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct SharedPathSettings {
+    claude_config_dir: Option<String>,
+    codex_config_dir: Option<String>,
+    gemini_config_dir: Option<String>,
+    grok_config_dir: Option<String>,
+    opencode_config_dir: Option<String>,
+    openclaw_config_dir: Option<String>,
+    hermes_config_dir: Option<String>,
+    pi_config_dir: Option<String>,
+    skill_storage_location: Option<String>,
+}
+
+impl SharedPathSettings {
+    fn config_dir(&self, app: &AppType) -> Option<&str> {
+        match app {
+            AppType::Claude => self.claude_config_dir.as_deref(),
+            AppType::Codex => self.codex_config_dir.as_deref(),
+            AppType::Gemini => self.gemini_config_dir.as_deref(),
+            AppType::GrokBuild => self.grok_config_dir.as_deref(),
+            AppType::OpenCode => self.opencode_config_dir.as_deref(),
+            AppType::OpenClaw => self.openclaw_config_dir.as_deref(),
+            AppType::Hermes => self.hermes_config_dir.as_deref(),
+            AppType::Pi => self.pi_config_dir.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct ResolvedConfigDirs {
+    roots: Vec<(AppType, PathBuf)>,
+}
+
+impl ResolvedConfigDirs {
+    pub(crate) fn root(&self, app: &AppType) -> Result<&Path, LiveError> {
+        self.roots
+            .iter()
+            .find_map(|(candidate, root)| (candidate == app).then_some(root.as_path()))
+            .ok_or_else(|| LiveError::Missing(format!("{} config root", app.as_str())))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_tests(home: &Path, claude: PathBuf, codex: PathBuf) -> Self {
+        let roots = builtin_app_registry()
+            .descriptors()
+            .filter_map(|descriptor| {
+                let app = descriptor.app().clone();
+                let root = match &app {
+                    AppType::Claude => claude.clone(),
+                    AppType::Codex => codex.clone(),
+                    AppType::Hermes => home.join(".hermes"),
+                    _ => home.join(descriptor.config_root().home_relative_path()?),
+                };
+                Some((app, root))
+            })
+            .collect();
+        Self { roots }
+    }
+}
+
+impl LiveConfig {
+    #[cfg(test)]
+    pub(crate) fn assert_mcp_fixture_paths(&self, home: &Path) {
+        self.mcp.assert_fixture_paths(home);
+    }
+
+    pub fn from_home(home: &Path) -> Result<Self, LiveError> {
+        let settings = load_shared_path_settings(home);
+        let dirs = resolve_config_dirs(home, &settings)?;
+        let claude_mcp = claude_mcp_path(home, dirs.root(&AppType::Claude)?)?;
+        let native = NativeLiveConfig::from_home(home, &dirs)?;
+        let mcp = McpLiveConfig::new(native.paths(), &dirs, [(AppType::Claude, claude_mcp)])?;
+        Ok(Self {
+            native,
+            mcp,
+            home: home.to_owned(),
+            lock_path: shared_live_config_lock_path(home),
+            gate: Mutex::new(()),
+            #[cfg(test)]
+            skill_fixture_dirs: None,
+        })
+    }
+
+    /// Test-only paths; never consult ambient App directory overrides.
+    #[cfg(test)]
+    pub(crate) fn for_skill_fixture(home: &Path) -> Self {
+        let home = home.canonicalize().unwrap();
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        assert!(home.starts_with(&temporary) && home != temporary);
+        let dirs = ResolvedConfigDirs::for_tests(&home, home.join(".claude"), home.join(".codex"));
+        assert!(dirs.roots.iter().all(|(_, root)| root.starts_with(&home)));
+        let native = NativeLiveConfig::for_tests(&home, home.join(".claude"), home.join(".codex"));
+        assert!(cc_switch_core::LogicalTarget::ALL
+            .iter()
+            .all(|target| native.paths().path_for(*target).starts_with(&home)));
+        let mcp = McpLiveConfig::new(
+            native.paths(),
+            &dirs,
+            [(AppType::Claude, home.join(".claude.json"))],
+        )
+        .unwrap();
+        mcp.assert_fixture_paths(&home);
+        Self {
+            native,
+            mcp,
+            lock_path: shared_live_config_lock_path(&home),
+            home,
+            gate: Mutex::new(()),
+            skill_fixture_dirs: Some(dirs),
+        }
+    }
+
+    pub fn import_native_drafts(&self, app_id: &str) -> Result<Vec<NativeImport>, LiveError> {
+        let app = app_id.parse::<cc_switch_core::AppType>().map_err(|_| {
+            LiveError::InvalidProvider("application is not available in Lite".to_owned())
+        })?;
+        self.with_lock(|| self.native.import_drafts(app))
+    }
+
+    pub fn inspect_skills(
+        &self,
+        catalog: &[SkillCatalogEntry],
+    ) -> Result<Vec<InstalledSkillSnapshot>, SkillHostError> {
+        let (_gate, _file_lock) = self.acquire_lock().map_err(map_skill_lock_error)?;
+        self.skill_config()?.inspect(catalog)
+    }
+
+    pub fn apply_skill_recoverable(
+        &self,
+        catalog: &[SkillCatalogEntry],
+        skill_id: &str,
+        app: &AppType,
+        requested: Option<bool>,
+    ) -> Result<SkillWriteReceipt<'_>, SkillHostError> {
+        let (gate, file_lock) = self.acquire_lock().map_err(map_skill_lock_error)?;
+        let value = self
+            .skill_config()?
+            .apply(catalog, skill_id, app, requested)?;
+        Ok(LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        })
+    }
+
+    pub fn commit_skill(&self, receipt: SkillWriteReceipt<'_>) -> Result<(), SkillHostError> {
+        let LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        } = receipt;
+        let result = value.commit();
+        drop(file_lock);
+        drop(gate);
+        result
+    }
+
+    pub fn rollback_skill(&self, receipt: SkillWriteReceipt<'_>) -> Result<(), SkillHostError> {
+        let LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        } = receipt;
+        let result = value.rollback();
+        #[cfg(test)]
+        crate::skill::acceptance_tests::after_recovery();
+        drop(file_lock);
+        drop(gate);
+        result
+    }
+
+    fn skill_config(&self) -> Result<SkillLiveConfig, SkillHostError> {
+        let settings = load_shared_path_settings(&self.home);
+        #[cfg(test)]
+        if let Some(dirs) = &self.skill_fixture_dirs {
+            return SkillLiveConfig::from_home(
+                &self.home,
+                dirs,
+                self.native.paths(),
+                settings.skill_storage_location.as_deref(),
+            );
+        }
+        let dirs = resolve_config_dirs(&self.home, &settings)
+            .map_err(|error| SkillHostError::Live(error.to_string()))?;
+        let native = NativeLiveConfig::from_home(&self.home, &dirs)
+            .map_err(|error| SkillHostError::Live(error.to_string()))?;
+        SkillLiveConfig::from_home(
+            &self.home,
+            &dirs,
+            native.paths(),
+            settings.skill_storage_location.as_deref(),
+        )
+    }
+
+    pub fn apply_mcp_recoverable(
+        &self,
+        changes: &mut [McpLiveChange],
+    ) -> Result<McpWriteReceipt<'_>, LiveError> {
+        self.lock_result(|| self.mcp.apply(changes))
+    }
+
+    pub fn rollback_mcp(&self, receipt: McpWriteReceipt<'_>) -> Result<(), LiveError> {
+        let LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        } = receipt;
+        let result = self.mcp.rollback(value);
+        drop(file_lock);
+        drop(gate);
+        result
+    }
+
+    pub fn observe_mcp(&self) -> Result<(McpImportsByApp, McpImportObservation<'_>), LiveError> {
+        let observation = self.lock_result(|| Ok(self.mcp.import_snapshot()))?;
+        let imports = observation.value.imports.clone();
+        Ok((imports, observation))
+    }
+
+    pub fn mcp_observation_is_current(&self, observation: &McpImportObservation<'_>) -> bool {
+        self.mcp.snapshot_is_current(&observation.value)
+    }
+
+    pub fn switch_native_recoverable(
+        &self,
+        provider: &ProviderRecord,
+        common_snippet: Option<&str>,
+    ) -> Result<LiveWriteReceipt<'_>, LiveError> {
+        let app = provider
+            .app_id
+            .parse::<cc_switch_core::AppType>()
+            .map_err(|_| {
+                LiveError::InvalidProvider("application is not available in Lite".to_owned())
+            })?;
+        if !provider
+            .adapter
+            .same_identity(&crate::provider::native_adapter_reference(&app))
+        {
+            return Err(LiveError::InvalidProvider(
+                "provider does not use its native application adapter".to_owned(),
+            ));
+        }
+        self.lock_result(|| {
+            let prepared = self.native.prepare_apply_plan(provider, common_snippet)?;
+            self.execute_recoverable_plan(&prepared.paths, &prepared.plan)
+        })
+    }
+
+    pub fn remove_native_recoverable(
+        &self,
+        provider: &ProviderRecord,
+    ) -> Result<LiveWriteReceipt<'_>, LiveError> {
+        let app = provider
+            .app_id
+            .parse::<cc_switch_core::AppType>()
+            .map_err(|_| {
+                LiveError::InvalidProvider("application is not available in Lite".to_owned())
+            })?;
+        if !app.is_additive_mode()
+            || !provider
+                .adapter
+                .same_identity(&crate::provider::native_adapter_reference(&app))
+        {
+            return Err(LiveError::InvalidProvider(
+                "provider does not use an additive native adapter".to_owned(),
+            ));
+        }
+        self.lock_result(|| {
+            let prepared = self.native.prepare_remove_plan(provider)?;
+            self.execute_recoverable_plan(&prepared.paths, &prepared.plan)
+        })
+    }
+
+    pub fn rollback(&self, receipt: LiveWriteReceipt<'_>) -> Result<(), LiveError> {
+        let LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        } = receipt;
+        let result = value.rollback().map_err(LiveError::from);
+        drop(file_lock);
+        drop(gate);
+        result
+    }
+
+    fn execute_recoverable_plan(
+        &self,
+        paths: &LivePaths,
+        plan: &OperationPlan,
+    ) -> Result<OperationReceipt, LiveError> {
+        OperationExecutor::new(paths)
+            .execute_recoverable(plan)
+            .map_err(Into::into)
+    }
+
+    fn with_lock<T>(&self, action: impl FnOnce() -> Result<T, LiveError>) -> Result<T, LiveError> {
+        let (_guard, _file_lock) = self.acquire_lock()?;
+        action()
+    }
+
+    fn lock_result<T>(
+        &self,
+        action: impl FnOnce() -> Result<T, LiveError>,
+    ) -> Result<LockedLiveReceipt<'_, T>, LiveError> {
+        let (gate, file_lock) = self.acquire_lock()?;
+        let value = action()?;
+        Ok(LockedLiveReceipt {
+            value,
+            gate,
+            file_lock,
+        })
+    }
+
+    fn acquire_lock(&self) -> Result<(MutexGuard<'_, ()>, SharedLiveConfigLock), LiveError> {
+        let guard = self
+            .gate
+            .try_lock()
+            .map_err(|_| LiveError::LockUnavailable)?;
+        let file_lock = self.lock_file()?;
+        Ok((guard, file_lock))
+    }
+
+    fn lock_file(&self) -> Result<SharedLiveConfigLock, LiveError> {
+        SharedLiveConfigLock::try_acquire(&self.lock_path).map_err(|error| match error {
+            SharedLiveConfigLockError::Unavailable => LiveError::LockUnavailable,
+            SharedLiveConfigLockError::Io { path, source } => LiveError::Io { path, source },
+        })
+    }
+}
+
+fn resolve_config_dirs(
+    home: &Path,
+    settings: &SharedPathSettings,
+) -> Result<ResolvedConfigDirs, LiveError> {
+    let roots = builtin_app_registry()
+        .descriptors()
+        .filter_map(|descriptor| {
+            let app = descriptor.app().clone();
+            if app == AppType::Hermes {
+                let root = hermes_root(
+                    home,
+                    settings.config_dir(&app),
+                    std::env::var_os("HERMES_HOME").as_deref(),
+                    &crate::native_live::default_hermes_dir(home),
+                );
+                return Some(Ok((app, root)));
+            }
+            let relative = descriptor.config_root().home_relative_path()?;
+            let environment = config_root_environment(&app);
+            let label = if app == AppType::GrokBuild {
+                "Grok config directory".to_owned()
+            } else {
+                format!("{} config directory", descriptor.display_name())
+            };
+            Some(
+                configured_root(
+                    home,
+                    settings.config_dir(&app),
+                    environment.as_deref(),
+                    &home.join(relative),
+                    &label,
+                )
+                .map(|root| (app, root)),
+            )
+        })
+        .collect::<Result<Vec<_>, LiveError>>()?;
+    Ok(ResolvedConfigDirs { roots })
+}
+
+fn config_root_environment(app: &AppType) -> Option<std::ffi::OsString> {
+    match app {
+        AppType::Claude => std::env::var_os("CLAUDE_CONFIG_DIR"),
+        AppType::Codex => std::env::var_os("CODEX_HOME"),
+        AppType::Pi => std::env::var_os("PI_CODING_AGENT_DIR"),
+        _ => None,
+    }
+}
+
+fn map_skill_lock_error(error: LiveError) -> SkillHostError {
+    match error {
+        LiveError::LockUnavailable => SkillHostError::LockUnavailable,
+        other => SkillHostError::Live(other.to_string()),
+    }
+}
+
+fn load_shared_path_settings(home: &Path) -> SharedPathSettings {
+    let path = home.join(".cc-switch/settings.json");
+    let Ok(contents) = fs::read(path) else {
+        return SharedPathSettings::default();
+    };
+    if contents.len() > MAX_OPERATION_CONTENT_BYTES {
+        return SharedPathSettings::default();
+    }
+    serde_json::from_slice(&contents).unwrap_or_default()
+}
+
+fn configured_root(
+    home: &Path,
+    setting: Option<&str>,
+    environment: Option<&OsStr>,
+    default: &Path,
+    label: &str,
+) -> Result<PathBuf, LiveError> {
+    let setting = setting
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| resolve_shared_path(home, value));
+    let environment = environment
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    let configured = setting.or(environment);
+    config_root(configured.as_deref().map(Path::as_os_str), default, label)
+}
+
+fn hermes_root(
+    home: &Path,
+    setting: Option<&str>,
+    environment: Option<&OsStr>,
+    default: &Path,
+) -> PathBuf {
+    if let Some(setting) = setting {
+        return resolve_shared_path(home, setting);
+    }
+    environment
+        .map(|value| value.to_string_lossy())
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default.to_owned())
+}
+
+fn resolve_shared_path(home: &Path, raw: &str) -> PathBuf {
+    if raw == "~" {
+        home.to_owned()
+    } else if let Some(path) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\")) {
+        home.join(path)
+    } else {
+        PathBuf::from(raw)
+    }
+}
+
+fn claude_mcp_path(home: &Path, config_dir: &Path) -> Result<PathBuf, LiveError> {
+    let default_dir = config_root(None, &home.join(".claude"), "Claude config directory")?;
+    if path_eq_lexical(config_dir, &default_dir) {
+        return Ok(home.join(".claude.json"));
+    }
+    #[cfg(windows)]
+    if let Some(path) = derive_wsl_default_mcp_path(config_dir) {
+        return Ok(path);
+    }
+    Ok(config_dir.join(".claude.json"))
+}
+
+fn normalize_path_lexically(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            Component::Normal(part) => normalized.push(part),
+            Component::RootDir | Component::Prefix(_) => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
+}
+
+fn path_eq_lexical(left: &Path, right: &Path) -> bool {
+    comparable_path_key(left) == comparable_path_key(right)
+}
+
+fn comparable_path_key(path: &Path) -> String {
+    let mut key = normalize_path_lexically(path).to_string_lossy().to_string();
+    #[cfg(windows)]
+    {
+        key = key.replace('\\', "/");
+    }
+    while key.len() > 1 && key.ends_with('/') {
+        key.pop();
+    }
+    #[cfg(windows)]
+    key.make_ascii_lowercase();
+    key
+}
+
+#[cfg(windows)]
+fn derive_wsl_default_mcp_path(dir: &Path) -> Option<PathBuf> {
+    use std::path::Prefix;
+
+    let normalized = normalize_path_lexically(dir);
+    let mut components = normalized.components();
+    let prefix = match components.next()? {
+        Component::Prefix(prefix) => prefix,
+        _ => return None,
+    };
+    let server = match prefix.kind() {
+        Prefix::UNC(server, _) | Prefix::VerbatimUNC(server, _) => server.to_string_lossy(),
+        _ => return None,
+    };
+    if !server.eq_ignore_ascii_case("wsl$") && !server.eq_ignore_ascii_case("wsl.localhost") {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for component in components {
+        match component {
+            Component::RootDir | Component::CurDir => {}
+            Component::Normal(part) => parts.push(part.to_string_lossy().to_string()),
+            Component::ParentDir | Component::Prefix(_) => return None,
+        }
+    }
+    let home_default =
+        parts.len() == 3 && parts[0] == "home" && !parts[1].is_empty() && parts[2] == ".claude";
+    let root_default = parts.len() == 2 && parts[0] == "root" && parts[1] == ".claude";
+    (home_default || root_default)
+        .then(|| {
+            normalized
+                .parent()
+                .map(|parent| parent.join(".claude.json"))
+        })
+        .flatten()
+}
+
+fn config_root(
+    override_value: Option<&OsStr>,
+    default: &Path,
+    variable: &str,
+) -> Result<PathBuf, LiveError> {
+    let configured = override_value
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default.to_owned());
+    if !configured.is_absolute() {
+        return Err(LiveError::InvalidConfig(format!(
+            "{variable} must be an absolute path"
+        )));
+    }
+
+    let mut ancestor = configured.clone();
+    let mut missing = Vec::new();
+    loop {
+        match fs::metadata(&ancestor) {
+            Ok(metadata) if metadata.is_dir() => {
+                let mut resolved = fs::canonicalize(&ancestor).map_err(|source| LiveError::Io {
+                    path: ancestor.clone(),
+                    source,
+                })?;
+                for component in missing.iter().rev() {
+                    resolved.push(component);
+                }
+                return Ok(resolved);
+            }
+            Ok(_) => {
+                return Err(LiveError::InvalidConfig(format!(
+                    "{variable} must point to a directory"
+                )));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let name = ancestor.file_name().ok_or_else(|| {
+                    LiveError::InvalidConfig(format!("{variable} has no existing parent directory"))
+                })?;
+                missing.push(name.to_owned());
+                ancestor = ancestor
+                    .parent()
+                    .ok_or_else(|| {
+                        LiveError::InvalidConfig(format!(
+                            "{variable} has no existing parent directory"
+                        ))
+                    })?
+                    .to_owned();
+            }
+            Err(source) => {
+                return Err(LiveError::Io {
+                    path: ancestor,
+                    source,
+                });
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cc_switch_core::builtin_app_adapter;
+    use fs4::{FileExt, TryLockError};
+    use serde_json::json;
+    use std::fs::OpenOptions;
+
+    #[test]
+    fn config_dirs_cover_every_core_root_resource() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let home = directory.path();
+        let dirs = ResolvedConfigDirs::for_tests(home, home.join(".claude"), home.join(".codex"));
+
+        for descriptor in builtin_app_registry().descriptors() {
+            let adapter = builtin_app_adapter(descriptor.app());
+            let needs_root = adapter
+                .targets()
+                .iter()
+                .any(|target| target.resource_path().config_root_relative().is_some())
+                || descriptor.skill_contract().is_some_and(|contract| {
+                    contract.native_resource().config_root_relative().is_some()
+                });
+            if needs_root {
+                assert!(dirs.root(descriptor.app()).is_ok(), "{}", descriptor.id());
+            }
+            if let Some(relative) = descriptor.config_root().home_relative_path() {
+                assert_eq!(
+                    dirs.root(descriptor.app()).unwrap(),
+                    home.join(relative),
+                    "{}",
+                    descriptor.id()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn config_roots_require_absolute_paths_and_allow_missing_directories() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let default = directory.path().join("default");
+
+        assert!(matches!(
+            config_root(Some(OsStr::new("relative")), &default, "CODEX_HOME"),
+            Err(LiveError::InvalidConfig(_))
+        ));
+        assert_eq!(
+            config_root(None, &default, "CODEX_HOME").unwrap(),
+            fs::canonicalize(directory.path()).unwrap().join("default")
+        );
+    }
+
+    #[test]
+    fn claude_default_directory_always_uses_the_home_mcp_file() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let default = directory.path().join(".claude");
+        for configured in [
+            configured_root(
+                directory.path(),
+                None,
+                Some(OsStr::new("")),
+                &default,
+                "Claude config directory",
+            )
+            .unwrap(),
+            configured_root(
+                directory.path(),
+                default.to_str(),
+                None,
+                &default,
+                "Claude config directory",
+            )
+            .unwrap(),
+        ] {
+            assert_eq!(
+                claude_mcp_path(directory.path(), &configured).unwrap(),
+                directory.path().join(".claude.json")
+            );
+        }
+    }
+
+    #[test]
+    fn reads_only_shared_directory_settings_and_expands_home() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        fs::create_dir(directory.path().join(".cc-switch")).unwrap();
+        fs::write(
+            directory.path().join(".cc-switch/settings.json"),
+            r#"{"claudeConfigDir":"~/profiles/claude","webdavSync":{"password":"ignored"}}"#,
+        )
+        .unwrap();
+
+        let settings = load_shared_path_settings(directory.path());
+        let resolved = configured_root(
+            directory.path(),
+            settings.claude_config_dir.as_deref(),
+            None,
+            &directory.path().join(".claude"),
+            "Claude config directory",
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolved,
+            fs::canonicalize(directory.path())
+                .unwrap()
+                .join("profiles/claude")
+        );
+    }
+
+    #[test]
+    fn shared_pi_and_openclaw_directories_are_respected() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let pi = directory.path().join("profiles/pi");
+        let openclaw = directory.path().join("profiles/openclaw");
+        let settings = SharedPathSettings {
+            pi_config_dir: Some(pi.to_string_lossy().into_owned()),
+            openclaw_config_dir: Some(openclaw.to_string_lossy().into_owned()),
+            ..SharedPathSettings::default()
+        };
+
+        let resolved = resolve_config_dirs(directory.path(), &settings).unwrap();
+        let canonical = fs::canonicalize(directory.path()).unwrap();
+
+        assert_eq!(
+            resolved.root(&AppType::Pi).unwrap(),
+            canonical.join("profiles/pi")
+        );
+        assert_eq!(
+            resolved.root(&AppType::OpenClaw).unwrap(),
+            canonical.join("profiles/openclaw")
+        );
+    }
+
+    #[test]
+    fn skill_settings_are_reloaded_and_do_not_block_other_live_features() {
+        let directory = tempfile::tempdir().unwrap();
+        let live = LiveConfig::from_home(directory.path()).unwrap();
+        fs::create_dir(directory.path().join(".cc-switch")).unwrap();
+        fs::write(
+            directory.path().join(".cc-switch/settings.json"),
+            r#"{"skillStorageLocation":"future-value"}"#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            live.inspect_skills(&[]),
+            Err(SkillHostError::InvalidStorage(value)) if value == "future-value"
+        ));
+    }
+
+    #[test]
+    fn relative_hermes_root_does_not_invalidate_the_skill_catalog() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::create_dir(directory.path().join(".cc-switch")).unwrap();
+        fs::write(
+            directory.path().join(".cc-switch/settings.json"),
+            r#"{"hermesConfigDir":"relative/hermes"}"#,
+        )
+        .unwrap();
+
+        let live = LiveConfig::from_home(directory.path()).unwrap();
+        assert!(live.inspect_skills(&[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn hermes_home_matches_the_full_application_resolution() {
+        let home = Path::new("/home/tester");
+        let default = home.join(".hermes");
+
+        assert_eq!(
+            hermes_root(
+                home,
+                None,
+                Some(OsStr::new("  relative/hermes  ")),
+                &default
+            ),
+            PathBuf::from("relative/hermes")
+        );
+        assert_eq!(
+            hermes_root(home, None, Some(OsStr::new("   ")), &default),
+            default
+        );
+        assert_eq!(
+            hermes_root(
+                home,
+                Some("~/custom-hermes"),
+                Some(OsStr::new("ignored")),
+                &home.join(".hermes"),
+            ),
+            home.join("custom-hermes")
+        );
+    }
+
+    #[test]
+    fn mcp_receipt_holds_the_shared_lock_until_the_database_outcome() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        fs::create_dir(directory.path().join(".claude")).unwrap();
+        fs::write(directory.path().join(".claude.json"), "{}").unwrap();
+        let live = LiveConfig::from_home(directory.path()).unwrap();
+        let mut changes = [McpLiveChange::Upsert {
+            app: cc_switch_core::AppType::Claude,
+            id: "server".to_owned(),
+            previous: None,
+            server: json!({"command":"npx"}),
+            native_snapshot: None,
+            link_state: crate::mcp::McpNativeLinkState::Unowned,
+        }];
+        let receipt = live.apply_mcp_recoverable(&mut changes).unwrap();
+        let contender = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(shared_live_config_lock_path(directory.path()))
+            .unwrap();
+
+        assert!(matches!(
+            FileExt::try_lock(&contender),
+            Err(TryLockError::WouldBlock)
+        ));
+        drop(receipt);
+        FileExt::try_lock(&contender).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_roots_resolve_existing_symbolic_links() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let actual = directory.path().join("actual");
+        let linked = directory.path().join("linked");
+        fs::create_dir(&actual).unwrap();
+        symlink(&actual, &linked).unwrap();
+
+        assert_eq!(
+            config_root(Some(linked.as_os_str()), &actual, "CODEX_HOME").unwrap(),
+            fs::canonicalize(actual).unwrap()
+        );
+    }
+}
