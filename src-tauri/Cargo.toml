@@ -38,3 +38,12 @@ uuid = { version = "1.18", features = ["v4"] }
 [dev-dependencies]
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
 tempfile = "3.21"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_System_Registry",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }

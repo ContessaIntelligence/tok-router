@@ -45,6 +45,7 @@ These keep the upstream names on purpose. Renaming them breaks existing user dat
 - The URL opens in the system browser through the Rust command `open_routok_site` (`src-tauri/src/lib.rs`). The URL is hard-coded in Rust and the command takes no arguments. Do not make it accept a URL from the frontend.
 - The header `+` button's accessible name is `Add Routok Key for <app>`. The empty state button is plain `Add Routok Key`. They must differ, or tests that look up one button by name find two.
 - Success notices for switching a provider, setting the Claude Code default and removing a provider end with a restart reminder, for example "RouTok 已在 Claude Desktop 中启用，请重启 Claude Desktop 使用。" Importing a configuration does not need a restart, so that notice has no reminder.
+- Windows only: `src-tauri/src/webview2.rs` runs from `main()` before Tauri starts. It looks for the WebView2 runtime version (`pv`) under the EdgeUpdate `Clients` registry keys. If it is missing, a native message box (Chinese or English by the Windows UI language) gives install steps, and "Yes" opens the official Evergreen Bootstrapper link (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`), then the process exits. It is a native box because no Tauri window exists yet. The module and its `windows-sys` dependency are `cfg(windows)` only. The message text lives in that file and is not part of `i18n-zh.ts`.
 
 ## Provider presets (RouTok)
 
