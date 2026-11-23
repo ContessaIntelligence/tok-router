@@ -1,7 +1,7 @@
 name: Build
 
 # Runs only when a version tag (v*) is pushed. Builds unsigned Token Router
-# executables for Windows, Linux and macOS, then publishes them as a GitHub release.
+# executables (plus a Windows MSI installer) for Windows, Linux and macOS, then publishes them as a GitHub release.
 on:
   push:
     tags: ["v*"]
@@ -64,9 +64,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # No signing: --no-bundle produces the bare executable only.
+      # No signing. Linux and macOS get the bare executable. Windows also gets
+      # an MSI installer (WiX is downloaded by the Tauri CLI on the runner).
       - name: Build executable
+        if: runner.os != 'Windows'
         run: pnpm tauri build --no-bundle --ci --target "${{ matrix.target }}"
+
+      - name: Build executable and MSI installer
+        if: runner.os == 'Windows'
+        run: pnpm tauri build --bundles msi --ci --target "${{ matrix.target }}"
 
       - name: Collect artifact
         run: |
@@ -74,6 +80,8 @@ jobs:
           mkdir -p artifacts
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp "$out/token-router.exe" "artifacts/token-router-${{ matrix.name }}.exe"
+            msi=$(ls "$out"/bundle/msi/*.msi | head -n 1)
+            cp "$msi" "artifacts/token-router-${{ matrix.name }}.msi"
           else
             # tar keeps the executable bit, which a plain artifact upload would lose.
             tar -czf "artifacts/token-router-${{ matrix.name }}.tar.gz" -C "$out" token-router

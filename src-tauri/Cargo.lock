@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "cc-switch-lite"
-version = "0.1.0-alpha.1"
+version = "0.3.0"
 dependencies = [
  "cc-switch-core",
  "cc-switch-store",

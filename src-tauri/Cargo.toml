@@ -1,6 +1,6 @@
 [package]
 name = "cc-switch-lite"
-version = "0.1.0-alpha.1"
+version = "0.3.0"
 description = "Token Router - a provider configuration editor"
 license = "MIT"
 repository = "https://github.com/SaladDay/cc-switch-lite"

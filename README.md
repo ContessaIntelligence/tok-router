@@ -54,3 +54,10 @@ and resolved host paths. Reference identity is stored beside each native Skill
 root under `.cc-switch-skill-references/<app>` so future CC Switch hosts can use
 the same owner records. Existing native links created without Core ownership
 remain read-only instead of being adopted or removed implicitly.
+
+## Code signing policy
+
+Windows release binaries are signed with a certificate from the
+[SignPath Foundation](https://signpath.org/) once the project is approved. See
+[docs/CODE-SIGNING.md](docs/CODE-SIGNING.md) for the code signing policy, roles
+and release process.

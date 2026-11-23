@@ -77,29 +77,34 @@ Grok Build requires a model, so after picking RouTok the user must type one.
 Releases are built by `.github/workflows/build.yml`. It runs **only when a tag matching `v*` is pushed**. Pushing to `main` does not build.
 
 ```text
-git tag v0.1.0-alpha.1
-git push origin v0.1.0-alpha.1
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
-1. The `build` job runs `pnpm tauri build --no-bundle --ci --target <triple>` on four targets and uploads one artifact each. Nothing is signed, and there are no installers.
+1. The `build` job runs `pnpm tauri build --no-bundle --ci --target <triple>` on four targets and uploads one artifact each. Linux and macOS use `--no-bundle`. Windows runs `pnpm tauri build --bundles msi` and uploads both the exe and an MSI installer. Nothing is signed.
 2. When all four succeed, the `release` job downloads the artifacts and runs `gh release create <tag>` with generated notes. A tag containing `-` (for example `v0.1.0-alpha.1`) is marked as a pre-release.
 3. Release files:
 
-| Platform            | Runner / target                            | File                              |
-| ------------------- | ------------------------------------------ | --------------------------------- |
-| Windows x64         | `windows-latest`, `x86_64-pc-windows-msvc` | `token-router-windows-x64.exe`    |
-| Linux x64           | `ubuntu-22.04`, `x86_64-unknown-linux-gnu` | `token-router-linux-x64.tar.gz`   |
-| macOS Apple silicon | `macos-latest`, `aarch64-apple-darwin`     | `token-router-macos-arm64.tar.gz` |
-| macOS Intel         | `macos-latest`, `x86_64-apple-darwin`      | `token-router-macos-x64.tar.gz`   |
+| Platform            | Runner / target                            | File                                                           |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+| Windows x64         | `windows-latest`, `x86_64-pc-windows-msvc` | `token-router-windows-x64.exe`, `token-router-windows-x64.msi` |
+| Linux x64           | `ubuntu-22.04`, `x86_64-unknown-linux-gnu` | `token-router-linux-x64.tar.gz`                                |
+| macOS Apple silicon | `macos-latest`, `aarch64-apple-darwin`     | `token-router-macos-arm64.tar.gz`                              |
+| macOS Intel         | `macos-latest`, `x86_64-apple-darwin`      | `token-router-macos-x64.tar.gz`                                |
 
 Notes:
 
-- The tag name is not checked against the app version. The version lives in three files that must be bumped together: `package.json` (shown on the About page), `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`. Currently all three say `0.1.0-alpha.1`. Update them before tagging a release.
+- The tag name is not checked against the app version. The version lives in three files that must be bumped together: `package.json` (shown on the About page), `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`. Currently all three say `0.3.0` (also update the version assertion in `src/App.test.tsx` and `Cargo.lock`). Update them before tagging a release.
 - If one platform fails, no release is created. Fix the problem, then delete the tag locally and on the remote (`git push origin :refs/tags/<tag>`) and tag again.
 - Linux and macOS archives are `tar.gz` so the executable bit survives the artifact upload.
 - macOS may quarantine downloaded binaries (`xattr -d com.apple.quarantine token-router`).
-- `tauri.conf.json` has `bundle.active: false`. Turn it on only if installers are wanted.
+- `tauri.conf.json` has `bundle.active: true` with `targets: ["msi"]`. Linux and macOS builds pass `--no-bundle`, so only the Windows job produces an installer. The MSI needs a numeric-only version for WiX (`0.3.0` is fine; do not use a `-alpha.1` suffix without a numeric build identifier).
+- Windows built-in signing (`New-SelfSignedCertificate` and `Set-AuthenticodeSignature`) makes a self-signed certificate that other PCs do not trust, so it does not remove the SmartScreen warning. Do not add it to CI.
 - The release job needs the repo setting Actions, Workflow permissions, "Read and write permissions".
+
+## Code signing
+
+Windows signing through SignPath Foundation is prepared but not active. The policy and setup steps are in `docs/CODE-SIGNING.md`. Do not add the SignPath action to `build.yml` until the application is approved and its commit SHA is pinned (see below).
 
 ## GitHub Actions: pinned commit SHAs
 

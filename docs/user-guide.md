@@ -16,12 +16,12 @@ Download the file for your system from the
 Pick the newest release. Pre-release versions such as `v0.1.0-alpha.1` are listed
 there too.
 
-| System                | File                              |
-| --------------------- | --------------------------------- |
-| Windows (64-bit)      | `token-router-windows-x64.exe`    |
-| Linux (64-bit)        | `token-router-linux-x64.tar.gz`   |
-| macOS (Apple silicon) | `token-router-macos-arm64.tar.gz` |
-| macOS (Intel)         | `token-router-macos-x64.tar.gz`   |
+| System                | File                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| Windows (64-bit)      | `token-router-windows-x64.msi` (installer) or `token-router-windows-x64.exe` (portable) |
+| Linux (64-bit)        | `token-router-linux-x64.tar.gz`                                                         |
+| macOS (Apple silicon) | `token-router-macos-arm64.tar.gz`                                                       |
+| macOS (Intel)         | `token-router-macos-x64.tar.gz`                                                         |
 
 Notes:
 

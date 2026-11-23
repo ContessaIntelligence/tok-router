@@ -13,12 +13,12 @@ Grok Build、OpenCode、Pi、OpenClaw 和 Hermes 之间切换服务商。
 从 [GitHub Releases 页面](https://github.com/ContessaIntelligence/tok-router/releases)
 下载对应系统的文件。选择最新的版本。预发布版本（如 `v0.1.0-alpha.1`）也会列在那里。
 
-| 系统                | 文件                              |
-| ------------------- | --------------------------------- |
-| Windows（64 位）    | `token-router-windows-x64.exe`    |
-| Linux（64 位）      | `token-router-linux-x64.tar.gz`   |
-| macOS（Apple 芯片） | `token-router-macos-arm64.tar.gz` |
-| macOS（Intel 芯片） | `token-router-macos-x64.tar.gz`   |
+| 系统                | 文件                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| Windows（64 位）    | `token-router-windows-x64.msi`（安装包）或 `token-router-windows-x64.exe`（免安装） |
+| Linux（64 位）      | `token-router-linux-x64.tar.gz`                                                     |
+| macOS（Apple 芯片） | `token-router-macos-arm64.tar.gz`                                                   |
+| macOS（Intel 芯片） | `token-router-macos-x64.tar.gz`                                                     |
 
 说明：
 

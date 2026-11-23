@@ -14,6 +14,9 @@ export default defineConfig({
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {
+    // The CSP img-src has no data: source, so small SVGs must stay files
+    // instead of being inlined as data: URLs.
+    assetsInlineLimit: 0,
     target:
       process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
