@@ -24,15 +24,15 @@ const INSTALLER_URL: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 const CLIENT_KEYS: [(HKEY, &str); 3] = [
     (
         HKEY_LOCAL_MACHINE,
-        r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDD-D4D3D1DBFCAE}",
+        r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
     ),
     (
         HKEY_LOCAL_MACHINE,
-        r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDD-D4D3D1DBFCAE}",
+        r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
     ),
     (
         HKEY_CURRENT_USER,
-        r"Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDD-D4D3D1DBFCAE}",
+        r"Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
     ),
 ];
 
@@ -190,6 +190,13 @@ mod tests {
             let (title, text) = message(chinese);
             assert!(!title.is_empty());
             assert!(text.contains("MicrosoftEdgeWebview2Setup.exe"));
+        }
+    }
+
+    #[test]
+    fn client_keys_use_webview2_runtime_guid() {
+        for (_, key) in CLIENT_KEYS {
+            assert!(key.ends_with("{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"));
         }
     }
 

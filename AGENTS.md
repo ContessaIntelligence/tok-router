@@ -10,14 +10,14 @@ Guidance for AI agents working in this repository. Read it before changing brand
 
 User-facing name is **Token Router**. Do not write "CC Switch Lite" in new UI text or docs.
 
-| Place                                      | Value                                                                         |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| Window title, `productName`, About heading | `Token Router`                                                                |
-| Executable name                            | `token-router` (`token-router.exe` on Windows)                                |
-| About page copyright line                  | `Copyright: routok.com` (zh: `版权所有：routok.com`)                          |
-| Add-provider button                        | `Add Routok Key` (zh: `添加 Routok Key`)                                      |
-| Website                                    | `https://api.routok.com`, shown in full (including `https://`) and clickable  |
-| `LICENSE`                                  | Keep the original `SaladDay` copyright line. A routok.com line sits below it. |
+| Place                       | Value                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| Window title, About heading | `Token Router` (the `productName` and installer name are `TokenRouter`)       |
+| Executable name             | `TokenRouter` (`TokenRouter.exe` on Windows)                                  |
+| About page copyright line   | `Copyright: routok.com` (zh: `版权所有：routok.com`)                          |
+| Add-provider button         | `Add Routok Key` (zh: `添加 Routok Key`)                                      |
+| Website                     | `https://api.routok.com`, shown in full (including `https://`) and clickable  |
+| `LICENSE`                   | Keep the original `SaladDay` copyright line. A routok.com line sits below it. |
 
 The executable name comes from two places that must stay in sync: the `[[bin]]` entry in `src-tauri/Cargo.toml` and `mainBinaryName` in `src-tauri/tauri.conf.json`. Changing only the Cargo package name would also rename the lib crate and break `cargo` paths.
 
@@ -143,5 +143,5 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 - Rust is pinned to 1.88.0 by `rust-toolchain.toml`. Clippy warnings fail CI.
 - On Windows, git checks files out with CRLF, so a plain `prettier --check .` reports many files that CI (LF on Linux) accepts. Use `npx prettier --check --end-of-line auto .` locally.
 - `cargo test` has one failure on Windows without symlink rights: `skill::tests::startup_reconciliation_repairs_managed_reference_drift`. It fails on the original code too and passes on Linux and macOS.
-- A running `pnpm tauri dev` keeps `src-tauri/target/debug/token-router.exe` locked, so `cargo build` fails with "access denied". Stop the dev app, or build with `pnpm tauri build --no-bundle`, which writes to `target/release`.
+- A running `pnpm tauri dev` keeps `src-tauri/target/debug/TokenRouter.exe` locked, so `cargo build` fails with "access denied". Stop the dev app, or build with `pnpm tauri build --no-bundle`, which writes to `target/release`.
 - Commit and push only when the user asks.
