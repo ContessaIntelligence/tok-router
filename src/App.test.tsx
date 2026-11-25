@@ -1526,7 +1526,7 @@ describe("App", () => {
     );
     await user.click(screen.getByRole("tab", { name: "About" }));
     expect(screen.getByRole("heading", { name: "Token Router" })).toBeVisible();
-    expect(screen.getByText("v0.3.1")).toBeVisible();
+    expect(screen.getByText("v0.3.2")).toBeVisible();
     expect(
       screen.queryByRole("tab", { name: "Proxy" }),
     ).not.toBeInTheDocument();

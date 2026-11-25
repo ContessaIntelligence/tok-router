@@ -1,6 +1,6 @@
 [package]
 name = "cc-switch-lite"
-version = "0.3.1"
+version = "0.3.2"
 description = "Token Router - a provider configuration editor"
 license = "MIT"
 repository = "https://github.com/SaladDay/cc-switch-lite"
@@ -40,9 +40,12 @@ fs4 = { version = "1.1", default-features = false, features = ["sync"] }
 tempfile = "3.21"
 
 [target.'cfg(windows)'.dependencies]
+webview2-com-sys = "0.38"
+windows-core = "0.61"
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Globalization",
+  "Win32_System_Com",
   "Win32_System_Registry",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",

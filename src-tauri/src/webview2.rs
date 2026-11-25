@@ -71,6 +71,31 @@ pub fn ensure_installed() {
 }
 
 fn is_installed() -> bool {
+    official_api_finds_runtime() || registry_finds_runtime()
+}
+
+/// Asks the WebView2 loader, the same code Tauri uses, for the installed
+/// runtime. It also finds per-user installs and future registry changes.
+fn official_api_finds_runtime() -> bool {
+    use webview2_com_sys::Microsoft::Web::WebView2::Win32::GetAvailableCoreWebView2BrowserVersionString;
+    use windows_core::{PCWSTR, PWSTR};
+
+    let mut version = PWSTR::null();
+    // SAFETY: a null folder means "the installed Evergreen runtime"; on success
+    // the loader hands over a CoTaskMem string that we free below.
+    let result =
+        unsafe { GetAvailableCoreWebView2BrowserVersionString(PCWSTR::null(), &mut version) };
+    if result.is_err() || version.is_null() {
+        return false;
+    }
+    // SAFETY: `version` is a valid NUL-terminated UTF-16 string.
+    let text = unsafe { version.to_string() }.unwrap_or_default();
+    // SAFETY: allocated by the loader with CoTaskMemAlloc.
+    unsafe { windows_sys::Win32::System::Com::CoTaskMemFree(version.0.cast()) };
+    is_real_version(&text)
+}
+
+fn registry_finds_runtime() -> bool {
     CLIENT_KEYS
         .iter()
         .filter_map(|(root, key)| read_version(*root, key))
@@ -203,6 +228,10 @@ mod tests {
     #[test]
     fn detects_runtime_on_this_machine() {
         // Smoke test: must not panic. The result depends on the machine.
-        let _ = is_installed();
+        eprintln!(
+            "api={} registry={}",
+            official_api_finds_runtime(),
+            registry_finds_runtime()
+        );
     }
 }

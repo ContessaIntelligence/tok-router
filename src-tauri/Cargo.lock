@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "cc-switch-lite"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "cc-switch-core",
  "cc-switch-store",
@@ -332,6 +332,8 @@ dependencies = [
  "toml_edit 0.25.13+spec-1.1.0",
  "url",
  "uuid",
+ "webview2-com-sys",
+ "windows-core 0.61.2",
  "windows-sys 0.61.2",
 ]
 
