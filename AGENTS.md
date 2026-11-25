@@ -142,6 +142,5 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 
 - Rust is pinned to 1.88.0 by `rust-toolchain.toml`. Clippy warnings fail CI.
 - On Windows, git checks files out with CRLF, so a plain `prettier --check .` reports many files that CI (LF on Linux) accepts. Use `npx prettier --check --end-of-line auto .` locally.
-- `cargo test` has one failure on Windows without symlink rights: `skill::tests::startup_reconciliation_repairs_managed_reference_drift`. It fails on the original code too and passes on Linux and macOS.
 - A running `pnpm tauri dev` keeps `src-tauri/target/debug/TokenRouter.exe` locked, so `cargo build` fails with "access denied". Stop the dev app, or build with `pnpm tauri build --no-bundle`, which writes to `target/release`.
 - Commit and push only when the user asks.

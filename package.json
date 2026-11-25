@@ -1,7 +1,7 @@
 {
   "name": "token-router",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Token Router - a provider configuration editor",
   "type": "module",
   "engines": {

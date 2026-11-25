@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 
 use cc_switch_core::{
-    builtin_app_adapter, claude_desktop, gemini, AppType, HermesProviderSource, LiveDocumentSet,
-    LogicalTarget, NativeAction, NativeImportContext as CoreImportContext, NativeImportError,
-    NativeImportStep, NativePlanContext, NativePlanError, NativePlanRequest, NativeProviderAccess,
-    NativeProviderMode, ObservedDocument, ProviderSnapshot,
+    builtin_app_adapter, claude_desktop, codex, gemini, AppType, HermesProviderSource,
+    LiveDocumentSet, LogicalTarget, NativeAction, NativeImportContext as CoreImportContext,
+    NativeImportError, NativeImportStep, NativePlanContext, NativePlanError, NativePlanRequest,
+    NativeProviderAccess, NativeProviderMode, ObservedDocument, ProviderSnapshot,
 };
 use serde_json::{json, Map, Value};
 
@@ -218,7 +218,7 @@ impl NativeLiveConfig {
             .map_err(core_plan_error)?;
         let native = self.resolved_for_targets(&targets)?;
         let documents = native.observed_documents(&app, &targets)?;
-        let plan = adapter
+        let mut plan = adapter
             .plan_native(&NativePlanRequest {
                 action: NativeAction::Apply,
                 provider: &snapshot,
@@ -228,6 +228,9 @@ impl NativeLiveConfig {
                 context,
             })
             .map_err(core_plan_error)?;
+        if app == AppType::Codex && mode == NativeProviderMode::Custom {
+            align_codex_requires_openai_auth(&native.paths, &mut plan);
+        }
         Ok(PreparedNativePlan {
             paths: native.paths,
             plan,
@@ -423,6 +426,53 @@ fn core_import_error(error: NativeImportError) -> LiveError {
     match error {
         NativeImportError::Missing { resource } => LiveError::Missing(resource),
         error => LiveError::InvalidConfig(error.to_string()),
+    }
+}
+
+/// A custom Codex route that says `requires_openai_auth = true` makes Codex
+/// wait for a login stored in `auth.json`. The key itself comes from
+/// `experimental_bearer_token`, so without a login on disk Codex would sit on
+/// its sign-in screen. Turn the flag off in that case. An existing ChatGPT
+/// login is never touched.
+fn align_codex_requires_openai_auth(paths: &LivePaths, plan: &mut OperationPlan) {
+    let login_on_disk = read_optional(paths.path_for(LogicalTarget::CodexAuth))
+        .ok()
+        .flatten()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .is_some_and(|auth| codex::auth_has_credential_login_material(&auth));
+    if login_on_disk {
+        return;
+    }
+    let Some(write) = plan
+        .writes
+        .iter_mut()
+        .find(|write| write.target == LogicalTarget::CodexConfig)
+    else {
+        return;
+    };
+    let Some(updated) = write
+        .contents
+        .as_deref()
+        .and_then(clear_requires_openai_auth)
+    else {
+        return;
+    };
+    write.contents = Some(updated);
+}
+
+fn clear_requires_openai_auth(config: &str) -> Option<String> {
+    let mut document = config.parse::<toml_edit::DocumentMut>().ok()?;
+    let name = document.get("model_provider")?.as_str()?.to_owned();
+    let route = document
+        .get_mut("model_providers")?
+        .as_table_like_mut()?
+        .get_mut(&name)?
+        .as_table_like_mut()?;
+    if route.get("requires_openai_auth")?.as_bool()? {
+        route.insert("requires_openai_auth", toml_edit::value(false));
+        Some(document.to_string())
+    } else {
+        None
     }
 }
 
@@ -941,6 +991,51 @@ mod tests {
             .paths
             .path_for(LogicalTarget::CodexModelCatalog)
             .exists());
+    }
+
+    #[test]
+    fn codex_custom_switch_drops_login_requirement_unless_a_login_exists() {
+        let directory = tempfile::tempdir().unwrap();
+        let native = NativeLiveConfig::for_tests(
+            directory.path(),
+            directory.path().join(".claude"),
+            directory.path().join(".codex"),
+        );
+        let auth_path = native.paths.path_for(LogicalTarget::CodexAuth);
+        std::fs::create_dir_all(auth_path.parent().unwrap()).unwrap();
+        let custom = provider(
+            AppType::Codex,
+            "custom",
+            json!({
+                "auth": {"OPENAI_API_KEY": "provider-secret"},
+                "config": "model = \"m\"
+model_provider = \"custom\"
+[model_providers.custom]
+base_url = \"https://example.com\"
+requires_openai_auth = true
+"
+            }),
+        );
+        let written_config = |plan: &OperationPlan| {
+            plan.writes
+                .iter()
+                .find(|write| write.target == LogicalTarget::CodexConfig)
+                .and_then(|write| write.contents.clone())
+                .expect("Codex config write")
+        };
+
+        let plan = native.apply_plan(&custom, None).expect("plan");
+        let config = written_config(&plan);
+        assert!(config.contains("requires_openai_auth = false"));
+        assert!(config.contains("experimental_bearer_token = \"provider-secret\""));
+        assert!(plan
+            .writes
+            .iter()
+            .all(|write| write.target != LogicalTarget::CodexAuth));
+
+        std::fs::write(auth_path, r#"{"tokens":{"access_token":"oauth-login"}}"#).unwrap();
+        let plan = native.apply_plan(&custom, None).expect("plan");
+        assert!(written_config(&plan).contains("requires_openai_auth = true"));
     }
 
     #[test]

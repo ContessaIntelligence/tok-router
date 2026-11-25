@@ -323,7 +323,12 @@ mod tests {
         let live = LiveConfig::from_home(home.path()).unwrap();
 
         store.toggle(&live, "demo", AppType::Claude, true).unwrap();
-        fs::remove_file(home.path().join(".claude/skills/demo")).unwrap();
+        let link = home.path().join(".claude/skills/demo");
+        // Windows removes directory links with `remove_dir`, other platforms
+        // with `remove_file`.
+        if fs::remove_file(&link).is_err() {
+            fs::remove_dir(&link).unwrap();
+        }
 
         let (snapshots, failures) = store.reconcile_and_list(&live).unwrap();
         assert!(failures.is_empty());
