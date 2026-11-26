@@ -274,6 +274,7 @@ function simpleForms(appIds: AppId[]): SimpleProviderFormDescriptor[] {
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("cc-switch-lite:last-app", "claude");
     document.documentElement.className = "";
     for (const mock of Object.values(api)) mock.mockReset();
     for (const mock of Object.values(mcp)) mock.mockReset();

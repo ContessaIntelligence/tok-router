@@ -112,7 +112,7 @@ function FadePanel({
 
 function initialApp(): AppId {
   const stored = window.localStorage.getItem(APP_STORAGE_KEY);
-  return stored?.trim() || "claude";
+  return stored?.trim() || "claude-desktop";
 }
 
 function initialView(): View {
